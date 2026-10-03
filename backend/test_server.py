@@ -275,6 +275,10 @@ def _receive_websocket_msg(ws, expected_type: str, max_attempts: int = 15) -> di
 def test_websocket_commands(client: TestClient) -> None:
     """Verifies WebSocket command routing: START_SEQUENCE, STOP_SEQUENCE, RESET_STACK."""
     session.reset()
+    # Sequence execution is tested in explicit simulation mode; hot-folder mode
+    # is ingestion-only and must not be treated as a shutter-capable camera.
+    intervalometer.disconnect()
+    intervalometer.simulate = True
 
     with client.websocket_connect("/ws") as ws:
         # Initial greeting payload
@@ -307,6 +311,10 @@ def test_websocket_commands(client: TestClient) -> None:
         assert resp_reset["command"] == "RESET_STACK"
         assert resp_reset["success"] is True
         assert session.stacker.total_frames_processed == 0
+
+    intervalometer.stop_sequence()
+    intervalometer.disconnect()
+    intervalometer.simulate = False
 
 
 # =====================================================================

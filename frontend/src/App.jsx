@@ -49,6 +49,7 @@ export default function App() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [gpsCoords, setGpsCoords] = useState(null);
   const [availableUpdate, setAvailableUpdate] = useState(null);
+  const [commandError, setCommandError] = useState(null);
 
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -102,6 +103,13 @@ export default function App() {
         // Handle JSON Telemetry & Commands
         try {
           const data = JSON.parse(event.data);
+          if (data.type === 'command_response') {
+            if (data.command === 'START_SEQUENCE' && !data.success) {
+              setIsRunning(false);
+              setCommandError(data.error || 'Camera sequence could not start');
+              window.setTimeout(() => setCommandError(null), 7000);
+            }
+          }
           if (data.type === 'telemetry') {
             setTelemetry(() => {
               // Trigger harmonious chime if new frame was added
@@ -259,6 +267,7 @@ export default function App() {
 
   // 5. Sequence Execution Handlers
   const handleStartSequence = () => {
+    setCommandError(null);
     setIsRunning(true);
     sendCommand({
       command: 'START_SEQUENCE',
@@ -295,6 +304,12 @@ export default function App() {
             </div>
             <button type="button" aria-label="Dismiss update" onClick={() => setAvailableUpdate(null)} className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
           </div>
+        </div>
+      )}
+      {commandError && (
+        <div role="alert" className="fixed top-20 left-1/2 -translate-x-1/2 z-[55] max-w-[92vw] rounded-2xl border border-amber-400/40 bg-slate-950/95 px-4 py-3 text-center text-xs text-amber-200 shadow-2xl">
+          <strong className="block text-amber-300">Sequence not started</strong>
+          <span>{commandError}</span>
         </div>
       )}
       {/* Top Bar Actions (Top-Left): Profile & Camera Hub */}
@@ -351,6 +366,7 @@ export default function App() {
       <Viewport
         previewUrl={previewUrl}
         telemetry={telemetry}
+        isConnected={isConnected}
         isCrimson={isCrimson}
         revealDeepSky={revealDeepSky}
         clearCityGlow={clearCityGlow}

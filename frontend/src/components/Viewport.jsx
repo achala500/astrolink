@@ -17,6 +17,7 @@ import { apiFetch } from '../utils/api';
 export default function Viewport({ 
   previewUrl, 
   telemetry, 
+  isConnected,
   isCrimson, 
   revealDeepSky, 
   clearCityGlow,
@@ -597,6 +598,26 @@ export default function Viewport({
         onTouchEnd={handleTouchEnd}
         className="w-full h-full block"
       />
+
+      {/* Explicit state feedback prevents an empty preview from looking frozen. */}
+      {!previewUrl && !isDragOver && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none px-6">
+          <div className="max-w-sm rounded-2xl border border-white/10 bg-slate-950/75 px-5 py-4 text-center shadow-2xl backdrop-blur-md">
+            <div className="text-sm font-semibold text-slate-100">
+              {!isConnected ? 'Connecting to AstroLink station…' :
+                telemetry?.cameraMode === 'folder_watch' ? 'Hot-folder ingestion ready' :
+                telemetry?.cameraMode === 'gphoto2' ? 'Waiting for first exposure' :
+                'Waiting for first exposure'}
+            </div>
+            <div className="mt-1 text-[11px] leading-relaxed text-slate-400">
+              {!isConnected ? 'The local control link is offline.' :
+                telemetry?.cameraMode === 'folder_watch' ? 'Drop or copy completed camera files into the watched folder. Hot-folder mode cannot trigger the shutter.' :
+                telemetry?.cameraMode === 'gphoto2' ? 'Your shutter-capable camera is connected. Start a sequence or upload a sub-exposure.' :
+                'Connect a shutter-capable camera over USB, or upload a sub-exposure to begin the preview.'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Drag & Drop Visual Drop Zone Overlay */}
       {isDragOver && (

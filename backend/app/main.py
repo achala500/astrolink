@@ -703,6 +703,9 @@ async def websocket_telemetry(websocket: WebSocket):
         "alertMessage": session.last_alert_message,
         "preview": session.last_preview_webp_b64,
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     }
     await websocket.send_json(init_payload)
 
@@ -747,6 +750,7 @@ async def websocket_telemetry(websocket: WebSocket):
                     "command": "START_SEQUENCE",
                     "success": started,
                     "running": intervalometer.is_running,
+                    "error": (intervalometer.last_error or "No shutter-capable camera connected") if not started else None,
                 })
 
             elif command == "STOP_SEQUENCE":
@@ -769,6 +773,9 @@ async def websocket_telemetry(websocket: WebSocket):
                     "alertMessage": None,
                     "preview": None,
                     "intervalometerRunning": intervalometer.is_running,
+                    "cameraMode": intervalometer.camera_mode,
+                    "cameraConnected": intervalometer.is_connected,
+                    "cameraError": intervalometer.last_error,
                 }
                 await ws_manager.broadcast_json(reset_payload)
                 await websocket.send_json({
@@ -800,6 +807,9 @@ async def get_status():
         "alertMessage": session.last_alert_message,
         "activeClients": len(ws_manager.active_connections),
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     }
 
 
@@ -866,6 +876,9 @@ async def reset_session(request: Request):
         "alertMessage": None,
         "preview": None,
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     }
     await ws_manager.broadcast_json(payload)
     return {"status": "session_reset"}
@@ -904,6 +917,9 @@ async def activate_license(payload: Dict[str, Any], request: Request):
         "preview": session.last_preview_webp_b64,
         "license": lic_status.to_dict(),
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     })
 
     return {
@@ -989,6 +1005,9 @@ async def submit_feedback(payload: Dict[str, Any]):
         "snrGain": round(math.sqrt(max(1, stack_count)), 2),
         "alertMessage": session.last_alert_message,
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     }
 
     try:

@@ -332,6 +332,14 @@ class CameraIntervalometer:
             if not self.connect():
                 return False
 
+        # A hot-folder is an ingestion source, not a shutter-control device.
+        # Do not report a successful sequence when there is no camera capable
+        # of accepting a shutter command.
+        if self.camera_mode not in {"gphoto2", "simulate"}:
+            self.last_error = "No shutter-capable camera connected; use USB tether or hot-folder ingestion"
+            logger.warning(self.last_error)
+            return False
+
         self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._sequence_worker,
