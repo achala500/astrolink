@@ -370,6 +370,13 @@ def test_export_16bit_tiff_after_stack(client: TestClient) -> None:
     assert tiff_img.max() > 0
 
 
+def test_processing_settings_round_trip() -> None:
+    """Preview controls are server-side settings, not frontend-only decoration."""
+    session.set_processing_options(reveal_deep_sky=False, clear_city_glow=False)
+    assert session.set_processing_options() == {"revealDeepSky": False, "clearCityGlow": False}
+    session.set_processing_options(reveal_deep_sky=True, clear_city_glow=True)
+
+
 def test_intervalometer_rejects_invalid_parameters() -> None:
     """Rejects NaN, infinite, zero, and unreasonably large sequences."""
     interv = CameraIntervalometer(simulate=True)
