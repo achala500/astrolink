@@ -112,11 +112,21 @@ export default function DynamicIsland({
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center pointer-events-auto">
       {/* Dynamic Capsule */}
       <div 
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={expanded ? "Collapse telemetry panel" : "Expand telemetry panel"}
         onClick={() => setExpanded(!expanded)}
-        className={`group relative flex items-center justify-between cursor-pointer select-none px-4 py-2 rounded-full border transition-all duration-300 ease-apple-spring shadow-2xl backdrop-blur-2xl ${
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
+        className={`group relative flex items-center justify-between cursor-pointer select-none px-4 py-2 rounded-full border transition-all duration-300 ease-apple-spring shadow-2xl backdrop-blur-2xl focus-visible:outline-none focus-visible:ring-2 ${
           isCrimson 
-            ? 'bg-black/90 border-red-900/40 text-red-500 hover:border-red-600/60' 
-            : 'bg-slate-950/85 border-white/10 text-slate-200 hover:border-white/20'
+            ? 'bg-black/90 border-red-900/40 text-red-500 hover:border-red-600/60 focus-visible:ring-red-500'
+            : 'bg-slate-950/85 border-white/10 text-slate-200 hover:border-white/20 focus-visible:ring-emerald-400'
         } ${expanded ? 'w-[94vw] max-w-lg rounded-3xl p-5' : 'h-11 min-w-[320px] max-w-md'}`}
       >
         {!expanded ? (
@@ -194,8 +204,9 @@ export default function DynamicIsland({
                     e.stopPropagation();
                     onToggleAudio();
                   }}
-                  className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                  className="p-1 rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                   title="Toggle Tactile Audio"
+                  aria-label={audioEnabled ? "Mute Tactile Audio" : "Enable Tactile Audio"}
                 >
                   {audioEnabled ? (
                     <Volume2 className="w-4 h-4 opacity-75" />
