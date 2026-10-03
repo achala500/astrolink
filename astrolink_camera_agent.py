@@ -102,6 +102,26 @@ def discover_server_via_mdns() -> Optional[str]:
     return None
 
 
+def wait_for_stable_file(file_path: Path, checks: int = 3, interval: float = 0.4) -> bool:
+    """Wait until a camera file stops growing before uploading it."""
+    previous = -1
+    stable = 0
+    for _ in range(max(1, checks + 2)):
+        try:
+            current = file_path.stat().st_size
+        except OSError:
+            return False
+        if current > 0 and current == previous:
+            stable += 1
+            if stable >= checks:
+                return True
+        else:
+            stable = 0
+        previous = current
+        time.sleep(interval)
+    return False
+
+
 def upload_sub_exposure(server_url: str, file_path: Path, api_token: Optional[str] = None) -> bool:
     """Uploads a sub-exposure with bounded retries and optional API auth."""
     endpoint = f"{server_url.rstrip('/')}/api/upload"
@@ -182,9 +202,12 @@ def run_gphoto2_tether(server_url: str, save_dir: Path, api_token: Optional[str]
 
             for nf in sorted(new_files, key=lambda f: f.stat().st_mtime):
                 if nf.suffix.lower() in SUPPORTED_EXTENSIONS:
-                    # Give camera time to finalize file writing
-                    time.sleep(0.3)
-                    upload_sub_exposure(server_url, nf, api_token)
+                    # Cameras write large files incrementally; never upload a
+                    # partially written exposure.
+                    if wait_for_stable_file(nf):
+                        upload_sub_exposure(server_url, nf, api_token)
+                    else:
+                        logger.warning("Timed out waiting for camera file: %s", nf)
                 seen_files.add(nf)
 
     except KeyboardInterrupt:
@@ -207,8 +230,10 @@ def run_folder_watch(server_url: str, watch_dir: Path, api_token: Optional[str] 
 
             for nf in sorted(new_files, key=lambda f: f.stat().st_mtime):
                 if nf.suffix.lower() in SUPPORTED_EXTENSIONS:
-                    time.sleep(0.5)  # Wait for file write to complete
-                    upload_sub_exposure(server_url, nf, api_token)
+                    if wait_for_stable_file(nf):
+                        upload_sub_exposure(server_url, nf, api_token)
+                    else:
+                        logger.warning("Timed out waiting for watched file: %s", nf)
                 seen_files.add(nf)
     except KeyboardInterrupt:
         logger.info("Exiting folder watch...")

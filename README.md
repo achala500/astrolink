@@ -152,6 +152,27 @@ Never put `ASTROLINK_LICENSE_MINT_PRIVATE_KEY` in Docker, Render, Railway, Fly.i
 
 ---
 
+## Camera Connection Model (The Camera Does Not Need a Browser)
+
+AstroLink never requires a browser on a DSLR or astronomy camera. The browser belongs on the **user laptop or phone** only.
+
+Supported paths:
+
+```text
+Camera --USB--> Laptop running AstroLink --Wi-Fi--> Phone browser
+Camera --USB--> Raspberry Pi/camera agent --Wi-Fi--> Laptop running AstroLink
+Phone camera --browser camera permission--> Laptop running AstroLink
+Camera/SD card --> Hot folder watched by camera agent --> Laptop AstroLink
+```
+
+For a camera connected to another computer, run the bridge on that computer:
+
+```bash
+python astrolink_camera_agent.py --server http://192.168.1.50:8080
+```
+
+The agent uses USB/gphoto2 or a watched directory and sends image files to AstroLink. It waits for each file to stop growing before upload, so partially written RAW/FITS files are not processed. The camera itself needs no web browser, account, or cloud connection.
+
 ## Multi-Cloud Hosting and Field-Station Architecture
 
 AstroLink has two deliberately different operating modes:

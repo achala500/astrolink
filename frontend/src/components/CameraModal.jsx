@@ -193,10 +193,10 @@ export default function CameraModal({ isOpen, onClose, isCrimson, backendUrl }) 
             <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-inherit/15 space-y-2">
               <div className="font-bold flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-mono font-bold text-[11px]">1</span>
-                <span>Camera Connects via USB (Zero Browser Needed)</span>
+                <span>Camera Connects via USB — No Camera Browser Needed</span>
               </div>
               <p className="text-[11px] opacity-75 leading-relaxed pl-7">
-                DSLRs and astro cameras have no web browser. They plug via a standard <b>USB cable</b> (USB-C/mini-USB) directly into your laptop or Raspberry Pi mounted on the telescope. AstroLink talks directly to the camera over USB PTP protocol.
+                The camera does not need a browser. It plugs via a standard <b>USB cable</b> (USB-C/mini-USB) into the laptop or Raspberry Pi running the AstroLink camera agent. AstroLink talks directly to the camera over USB PTP or gphoto2; the browser is used only on the user’s laptop or phone.
               </p>
             </div>
 
