@@ -387,3 +387,32 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_prevention(client: TestClient) -> None:
+    """Verifies path traversal attempts on FeedbackManager and API endpoint are rejected."""
+    from backend.app.feedback import feedback_manager
+
+    traversal_payloads = [
+        "../feedback.json",
+        "../../etc/passwd",
+        "..",
+        ".",
+        "attachments/../feedback.json",
+        "/etc/passwd",
+        "",
+    ]
+
+    # Test unit method directly
+    for payload in traversal_payloads:
+        assert feedback_manager.get_attachment_path(payload) is None, f"Payload '{payload}' was not rejected by get_attachment_path"
+
+    # Test endpoint responses
+    api_payloads = [
+        "%2e%2e%2ffeedback.json",
+        "nonexistent_file.png",
+        "test_ss_1.png",
+    ]
+    for payload in api_payloads:
+        resp = client.get(f"/api/feedback/attachment/{payload}")
+        assert resp.status_code == 404, f"API endpoint for '{payload}' returned {resp.status_code}, expected 404"
