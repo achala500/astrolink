@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState } from 'react';
 import { 
   X, 
@@ -51,7 +52,7 @@ export default function ExportSheet({
       soundEngine.playClick();
 
       const exportEndpoint = `${backendUrl || ''}/api/export`;
-      const response = await fetch(exportEndpoint);
+      const response = await apiFetch(exportEndpoint);
       if (!response.ok) {
         throw new Error(`Export failed: ${response.statusText}`);
       }

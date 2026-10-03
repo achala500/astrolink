@@ -92,6 +92,12 @@ npm run build   # Production bundle in frontend/dist
 
 ---
 
+## Downloads and Desktop Packaging
+
+Official tagged builds are published on the [GitHub Releases page](https://github.com/achala500/astrolink/releases) when a version tag is created. Releases include Windows and Linux binaries plus SHA-256 checksum files. macOS source builds are supported; a macOS binary is published when a compatible runner is available. Read [RELEASE.md](RELEASE.md) before installing.
+
+No unsigned Windows executable can be guaranteed to avoid every Defender/SmartScreen reputation warning. The release build disables UPX compression, avoids persistence and obfuscation, and publishes checksums. An organization-owned Authenticode certificate is required for a publisher-verified Windows installer.
+
 ## Desktop Packaging (PyInstaller Single-Executable)
 
 AstroLink includes a production `astrolink.spec` that automatically collects all OpenCV dynamic DLLs, LibRaw C-libraries (via RawPy), SciPy, Astropy tables, and bundles the compiled React `frontend/dist` directly into the binary's `sys._MEIPASS`.
@@ -137,19 +143,50 @@ AstroLink operates **100% offline with zero external network pings**.
 
 ### Minting New License Keys (CLI)
 
-```bash
-# Mint a lifetime license
-python -m backend.app.licensing mint "Dr. Elena Vance" "lifetime"
+The signing private key is intentionally **not shipped in the repository or application**. Run the minting command only on a secure licensing workstation:
 
-# Verify a license string offline
+```bash
+export ASTROLINK_LICENSE_MINT_PRIVATE_KEY="<32-byte-ed25519-seed-in-hex>"
+python -m backend.app.licensing mint "Dr. Elena Vance" "lifetime"
+unset ASTROLINK_LICENSE_MINT_PRIVATE_KEY
+
+# Verify a license string offline on any installation
 python -m backend.app.licensing verify "<base64-license-key>"
 ```
 
+Never put `ASTROLINK_LICENSE_MINT_PRIVATE_KEY` in Docker, Render, Railway, Fly.io, browser JavaScript, or a public CI log. The application only contains the verification public key.
+
 ---
 
-## Free Multi-Platform Cloud Hosting
+## Camera Connection Model (The Camera Does Not Need a Browser)
 
-AstroLink can be deployed on **6 free cloud platforms** for remote EAA demonstrations and team sharing:
+AstroLink never requires a browser on a DSLR or astronomy camera. The browser belongs on the **user laptop or phone** only.
+
+Supported paths:
+
+```text
+Camera --USB--> Laptop running AstroLink --Wi-Fi--> Phone browser
+Camera --USB--> Raspberry Pi/camera agent --Wi-Fi--> Laptop running AstroLink
+Phone camera --browser camera permission--> Laptop running AstroLink
+Camera/SD card --> Hot folder watched by camera agent --> Laptop AstroLink
+```
+
+For a camera connected to another computer, run the bridge on that computer:
+
+```bash
+python astrolink_camera_agent.py --server http://192.168.1.50:8080
+```
+
+The agent uses USB/gphoto2 or a watched directory and sends image files to AstroLink. It waits for each file to stop growing before upload, so partially written RAW/FITS files are not processed. The camera itself needs no web browser, account, or cloud connection.
+
+## Multi-Cloud Hosting and Field-Station Architecture
+
+AstroLink has two deliberately different operating modes:
+
+- **Field station mode (recommended for real cameras):** run the service on the laptop/Raspberry Pi connected to the camera. USB tethering, gphoto2, mDNS, and the local intervalometer stay on the same network as the hardware.
+- **Cloud demo mode:** deploy the container for remote viewing, uploads, pipeline testing, licensing, and team sharing. Cloud providers cannot access a DSLR connected to your home or observatory, so camera control remains disabled unless the camera is physically attached to that cloud machine.
+
+The Docker image is provider-portable: it listens on the injected `PORT` value (falling back to `8080`) and exposes `/api/status` as a health check. AstroLink can be deployed on **6 cloud platforms** for remote EAA demonstrations and team sharing:
 
 | Platform | Free Tier | Deploy Method | Config File |
 |---|---|---|---|
@@ -158,7 +195,49 @@ AstroLink can be deployed on **6 free cloud platforms** for remote EAA demonstra
 | **Railway.app** | \$5 credit/month | Connect GitHub repo | `railway.json` |
 | **Koyeb** | 1 free nano instance | Connect GitHub repo | `koyeb.yaml` |
 | **Hugging Face Spaces** | 16GB RAM + 2 vCPUs | Push as Docker Space | `Dockerfile` |
-| **GitHub Container Registry** | Unlimited public images | Auto-published via CI/CD | `.github/workflows/ci-cd.yml` |
+| **GitHub Container Registry** | Public image hosting | Auto-published via CI/CD | `.github/workflows/ci-cd.yml` |
+
+> Free plans and quotas change frequently. Treat Render/Koyeb/Fly as demo targets and do not rely on an ephemeral instance for irreplaceable astrophotography data. The live stack is intentionally in memory; export the TIFF after a session.
+
+### Deploy the portable container
+
+Build and smoke-test locally first:
+
+```bash
+docker build -t astrolink:local .
+docker run --rm -p 8080:8080 -e PORT=8080 astrolink:local
+curl http://localhost:8080/api/status
+```
+
+Every provider should wait for `GET /api/status` to return `200` before routing traffic. For a cloud deployment, use a private license key through `ASTROLINK_LICENSE`; never commit a generated license key or camera credentials.
+
+For public deployments, configure the feedback administration token:
+
+```bash
+ASTROLINK_ADMIN_TOKEN="use-a-long-random-secret"
+```
+
+When configured, send `Authorization: Bearer <token>` to feedback listing, exports, status updates, clearing, and attachment download endpoints. Feedback submission remains available to end users. Without this token, those administrative endpoints are intentionally open for local/offline installations only; do not expose that mode publicly.
+
+For a private cloud API, also set `ASTROLINK_API_TOKEN`. This protects frame upload, export, reset, camera detection/status, license activation/deactivation, and WebSocket commands. Build the frontend with the matching `VITE_ASTROLINK_API_TOKEN`; it will attach the token to API requests and the WebSocket connection. Do not use this mode for a public multi-user application because browser users can inspect any token embedded in their frontend bundle.
+
+To preserve a stack across a restart, mount persistent storage and set:
+
+```bash
+ASTROLINK_SESSION_FILE=/data/astrolink-session.npz
+```
+
+Without a persistent volume, a cloud restart intentionally clears the in-memory stack.
+
+For cloud deployments with no directly attached camera, also set:
+
+```bash
+ASTROLINK_DISABLE_HARDWARE=true
+ASTROLINK_DISABLE_MDNS=true
+ASTROLINK_ALLOWED_ORIGINS=https://your-frontend.example.com
+```
+
+This prevents misleading hardware discovery, unnecessary tether workers, and useless mDNS broadcasts from cloud containers.
 
 ### Option A: Render.com (Recommended — Zero Config)
 1. Go to [render.com/new](https://render.com/new) → **New Web Service**.

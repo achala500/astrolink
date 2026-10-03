@@ -7,8 +7,8 @@ services:
     dockerfilePath: Dockerfile
     dockerContext: .
     envVars:
-      - key: PORT
-        value: 8080
+      # Render supplies PORT automatically; Docker uses 8080 only as a local fallback.
       - key: PYTHONUNBUFFERED
         value: "1"
     autoDeploy: true
+    healthCheckPath: /api/status

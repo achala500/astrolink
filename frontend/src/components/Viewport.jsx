@@ -12,10 +12,12 @@ import {
   Loader2 
 } from 'lucide-react';
 import { soundEngine } from '../utils/audio';
+import { apiFetch } from '../utils/api';
 
 export default function Viewport({ 
   previewUrl, 
   telemetry, 
+  isConnected,
   isCrimson, 
   revealDeepSky, 
   clearCityGlow,
@@ -409,21 +411,32 @@ export default function Viewport({
     });
 
     let successCount = 0;
+    let failureMessages = [];
     for (let i = 0; i < validFiles.length; i++) {
       const file = validFiles[i];
       const formData = new FormData();
       formData.append('file', file);
 
       try {
-        const res = await fetch(`${backendUrl || ''}/api/upload`, {
+        const res = await apiFetch(`${backendUrl || ''}/api/upload`, {
           method: 'POST',
           body: formData,
         });
         if (res.ok) {
           successCount++;
+        } else {
+          let detail = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            detail = body.detail || body.details || body.reason || detail;
+          } catch {
+            // Keep the status fallback when the server did not return JSON.
+          }
+          failureMessages.push(`${file.name}: ${detail}`);
         }
       } catch (err) {
         console.error('File upload error:', err);
+        failureMessages.push(`${file.name}: network error`);
       }
 
       setUploadStatus({
@@ -433,10 +446,13 @@ export default function Viewport({
       });
     }
 
+    const resultText = failureMessages.length
+      ? `${successCount} stacked, ${failureMessages.length} rejected. ${failureMessages[0]}`
+      : `Successfully stacked ${successCount} sub-exposure(s)!`;
     setUploadStatus({
-      text: `Successfully stacked ${successCount} sub-exposure(s)!`,
+      text: resultText,
       progress: 100,
-      type: 'success'
+      type: failureMessages.length === validFiles.length ? 'error' : (failureMessages.length ? 'info' : 'success')
     });
 
     setTimeout(() => {
@@ -527,7 +543,7 @@ export default function Viewport({
       const formData = new FormData();
       formData.append('file', file);
       try {
-        await fetch(`${backendUrl || ''}/api/upload`, {
+        await apiFetch(`${backendUrl || ''}/api/upload`, {
           method: 'POST',
           body: formData,
         });
@@ -582,6 +598,26 @@ export default function Viewport({
         onTouchEnd={handleTouchEnd}
         className="w-full h-full block"
       />
+
+      {/* Explicit state feedback prevents an empty preview from looking frozen. */}
+      {!previewUrl && !isDragOver && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none px-6">
+          <div className="max-w-sm rounded-2xl border border-white/10 bg-slate-950/75 px-5 py-4 text-center shadow-2xl backdrop-blur-md">
+            <div className="text-sm font-semibold text-slate-100">
+              {!isConnected ? 'Connecting to AstroLink station…' :
+                !telemetry?.cameraConnected ? 'Camera not connected' :
+                telemetry?.cameraMode === 'folder_watch' ? 'Hot-folder ingestion ready' :
+                'Waiting for first exposure'}
+            </div>
+            <div className="mt-1 text-[11px] leading-relaxed text-slate-400">
+              {!isConnected ? 'The local control link is offline.' :
+                !telemetry?.cameraConnected ? 'Connect a shutter-capable camera over USB, or upload a sub-exposure to begin the preview.' :
+                telemetry?.cameraMode === 'folder_watch' ? 'Drop or copy completed camera files into the watched folder. Hot-folder mode cannot trigger the shutter.' :
+                'Your shutter-capable camera is connected. Start a sequence or upload a sub-exposure.'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Drag & Drop Visual Drop Zone Overlay */}
       {isDragOver && (

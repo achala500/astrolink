@@ -27,18 +27,27 @@ from PyInstaller.utils.hooks import (
 # Current project directory
 SPECPATH = os.path.abspath(SPECPATH)
 
-# 1. Collect all shared binaries/DLLs (OpenCV, LibRaw via RawPy, etc.)
-binaries = []
-binaries += collect_dynamic_libs("cv2")
-binaries += collect_dynamic_libs("rawpy")
+# 1. Collect shared binaries/DLLs when the optional package exists.
+# RAW support is optional in a desktop build because rawpy does not publish a
+# wheel for every OS/Python combination; the app falls back with a clear error.
+def optional_dynamic_libs(package):
+    try:
+        __import__(package)
+        return collect_dynamic_libs(package)
+    except ImportError:
+        print(f"[PyInstaller Spec] Optional package unavailable: {package}")
+        return []
+
+binaries = optional_dynamic_libs("cv2") + optional_dynamic_libs("rawpy")
 
 # 2. Collect package data files
 datas = []
-datas += collect_data_files("astropy")
-datas += collect_data_files("scipy")
-datas += collect_data_files("cryptography")
-datas += collect_data_files("rawpy")
-datas += collect_data_files("cv2")
+for optional_package in ("astropy", "cryptography", "rawpy", "cv2"):
+    try:
+        __import__(optional_package)
+        datas += collect_data_files(optional_package)
+    except ImportError:
+        pass
 
 # 3. Bundle compiled React frontend into sys._MEIPASS
 frontend_dist_source = os.path.join(SPECPATH, "frontend", "dist")
@@ -80,12 +89,6 @@ hiddenimports = [
     # Computer vision & scientific stack
     "cv2",
     "numpy",
-    "scipy",
-    "scipy.signal",
-    "scipy.ndimage",
-    "scipy.optimize",
-    "scipy.linalg",
-    "rawpy",
     "astropy",
     "astropy.io.fits",
     "tifffile",
@@ -145,7 +148,9 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # UPX compression often increases antivirus false positives. Keep the
+    # executable uncompressed for reproducible, Defender-friendly builds.
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,  # Set to True for field diagnostics/logs; can be toggled to False for windowless

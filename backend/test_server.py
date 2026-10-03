@@ -275,6 +275,10 @@ def _receive_websocket_msg(ws, expected_type: str, max_attempts: int = 15) -> di
 def test_websocket_commands(client: TestClient) -> None:
     """Verifies WebSocket command routing: START_SEQUENCE, STOP_SEQUENCE, RESET_STACK."""
     session.reset()
+    # Sequence execution is tested in explicit simulation mode; hot-folder mode
+    # is ingestion-only and must not be treated as a shutter-capable camera.
+    intervalometer.disconnect()
+    intervalometer.simulate = True
 
     with client.websocket_connect("/ws") as ws:
         # Initial greeting payload
@@ -307,6 +311,10 @@ def test_websocket_commands(client: TestClient) -> None:
         assert resp_reset["command"] == "RESET_STACK"
         assert resp_reset["success"] is True
         assert session.stacker.total_frames_processed == 0
+
+    intervalometer.stop_sequence()
+    intervalometer.disconnect()
+    intervalometer.simulate = False
 
 
 # =====================================================================
@@ -368,6 +376,22 @@ def test_export_16bit_tiff_after_stack(client: TestClient) -> None:
     assert tiff_img.dtype == np.uint16
     assert tiff_img.shape[:2] == (512, 512)
     assert tiff_img.max() > 0
+
+
+def test_processing_settings_round_trip() -> None:
+    """Preview controls are server-side settings, not frontend-only decoration."""
+    session.set_processing_options(reveal_deep_sky=False, clear_city_glow=False)
+    assert session.set_processing_options() == {"revealDeepSky": False, "clearCityGlow": False}
+    session.set_processing_options(reveal_deep_sky=True, clear_city_glow=True)
+
+
+def test_intervalometer_rejects_invalid_parameters() -> None:
+    """Rejects NaN, infinite, zero, and unreasonably large sequences."""
+    interv = CameraIntervalometer(simulate=True)
+    assert interv.start_sequence(float("nan"), 1) is False
+    assert interv.start_sequence(1.0, 0) is False
+    assert interv.start_sequence(1.0, 10001) is False
+    assert interv.start_sequence(1.0, 1, delay_seconds=float("inf")) is False
 
 
 def test_hardware_tether_daemon() -> None:

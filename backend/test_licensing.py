@@ -5,6 +5,14 @@ import json
 import numpy as np
 import pytest
 
+import backend.app.licensing as licensing_module
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
+# Test-only signing seed. Production minting requires an operator environment
+# variable and the production verifier uses a different public key.
+_TEST_MINT_SEED = "e183026132431287b098539935ecc0d00d1f777cf8487512f4d6ac122cc51f93"
+_TEST_PUBLIC_KEY = ed25519.Ed25519PrivateKey.from_private_bytes(bytes.fromhex(_TEST_MINT_SEED)).public_key().public_bytes_raw().hex()
+
 from backend.app.licensing import (
     LicenseManager,
     UNVERIFIED_FRAME_LIMIT,
@@ -12,6 +20,12 @@ from backend.app.licensing import (
     verify_license_key,
 )
 from backend.app.main import AstrophotographySession
+
+
+@pytest.fixture(autouse=True)
+def test_minting_environment(monkeypatch):
+    monkeypatch.setenv("ASTROLINK_LICENSE_MINT_PRIVATE_KEY", _TEST_MINT_SEED)
+    monkeypatch.setattr(licensing_module, "MASTER_PUBLIC_KEY_HEX", _TEST_PUBLIC_KEY)
 
 
 def test_mint_and_verify_valid_license():

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Camera } from 'lucide-react';
+import { User, Camera, DownloadCloud, X } from 'lucide-react';
 import DynamicIsland from './components/DynamicIsland';
 import Viewport from './components/Viewport';
 import Dock from './components/Dock';
@@ -9,6 +9,7 @@ import FeedbackSheet from './components/FeedbackSheet';
 import AuthModal from './components/AuthModal';
 import CameraModal from './components/CameraModal';
 import { soundEngine } from './utils/audio';
+import { apiFetch } from './utils/api';
 
 export default function App() {
   // Theme & Display State
@@ -47,6 +48,8 @@ export default function App() {
   });
   const [previewUrl, setPreviewUrl] = useState(null);
   const [gpsCoords, setGpsCoords] = useState(null);
+  const [availableUpdate, setAvailableUpdate] = useState(null);
+  const [commandError, setCommandError] = useState(null);
 
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -54,20 +57,22 @@ export default function App() {
   const prevStackCountRef = useRef(0);
   const wakeLockRef = useRef(null);
 
-  // Determine backend HTTP and WS URLs
+  // Use same-origin URLs so the app works behind HTTPS/reverse proxies and Arena previews.
+  // Vite proxies these paths to the local API during development.
   const getBackendUrls = () => {
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const host = isLocalhost ? '127.0.0.1:8080' : `${window.location.hostname}:8080`;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const token = import.meta.env.VITE_ASTROLINK_API_TOKEN;
+    const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
     return {
-      wsUrl: `ws://${host}/ws`,
-      httpUrl: `http://${host}`,
+      wsUrl: `${protocol}//${window.location.host}/ws${tokenQuery}`,
+      httpUrl: '',
     };
   };
 
   const { wsUrl, httpUrl } = getBackendUrls();
 
   // 1. WebSocket Auto-Reconnect with Exponential Backoff
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback(function connect() {
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -98,6 +103,21 @@ export default function App() {
         // Handle JSON Telemetry & Commands
         try {
           const data = JSON.parse(event.data);
+          if (data.type === 'command_response') {
+            if (data.cameraMode) {
+              setTelemetry(prev => ({
+                ...prev,
+                cameraMode: data.cameraMode,
+                cameraConnected: data.cameraConnected,
+                cameraError: data.error || null,
+              }));
+            }
+            if (data.command === 'START_SEQUENCE' && !data.success) {
+              setIsRunning(false);
+              setCommandError(data.error || 'Camera sequence could not start');
+              window.setTimeout(() => setCommandError(null), 7000);
+            }
+          }
           if (data.type === 'telemetry') {
             setTelemetry(() => {
               // Trigger harmonious chime if new frame was added
@@ -134,13 +154,13 @@ export default function App() {
         const backoff = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 8000);
         reconnectAttemptRef.current += 1;
         reconnectTimeoutRef.current = setTimeout(() => {
-          connectWebSocket();
+          connect();
         }, backoff);
       };
     } catch {
       setIsConnected(false);
       reconnectTimeoutRef.current = setTimeout(() => {
-        connectWebSocket();
+        connect();
       }, 3000);
     }
   }, [wsUrl]);
@@ -161,6 +181,29 @@ export default function App() {
       alert('Telescope server is offline. Check connection to astrolink.local.');
     }
   };
+
+  // Check for a verified release notification. Installation remains user-controlled.
+  useEffect(() => {
+    apiFetch('/api/update/check')
+      .then((response) => response.ok ? response.json() : null)
+      .then((update) => {
+        if (update?.updateAvailable && update.releaseUrl) setAvailableUpdate(update);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Sync preview controls with the server so a reload or second client does
+  // not silently use different processing settings.
+  useEffect(() => {
+    apiFetch('/api/settings')
+      .then((response) => response.ok ? response.json() : null)
+      .then((settings) => {
+        if (!settings) return;
+        if (typeof settings.revealDeepSky === 'boolean') setRevealDeepSky(settings.revealDeepSky);
+        if (typeof settings.clearCityGlow === 'boolean') setClearCityGlow(settings.clearCityGlow);
+      })
+      .catch(() => {});
+  }, []);
 
   // 2. Screen Wake Lock API (Keep phone display on during night session)
   useEffect(() => {
@@ -210,6 +253,17 @@ export default function App() {
     }
   }, []);
 
+  const updateProcessingSetting = (name, value) => {
+    apiFetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [name]: value }),
+    }).catch(() => {
+      // Keep the local control responsive; the next telemetry update will
+      // reflect the server state if the request could not be delivered.
+    });
+  };
+
   // 4. OLED Astro Red Mode Persistence
   const toggleCrimson = () => {
     setIsCrimson(prev => {
@@ -221,6 +275,7 @@ export default function App() {
 
   // 5. Sequence Execution Handlers
   const handleStartSequence = () => {
+    setCommandError(null);
     setIsRunning(true);
     sendCommand({
       command: 'START_SEQUENCE',
@@ -245,7 +300,26 @@ export default function App() {
   return (
     <div className={`fixed inset-0 w-full h-[100dvh] overflow-hidden select-none ${
       isCrimson ? 'theme-crimson bg-black text-red-500' : 'bg-black text-slate-100'
-    }`}>
+   }`}>
+      {availableUpdate && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-[min(92vw,30rem)] rounded-2xl border border-emerald-400/40 bg-slate-950/95 px-4 py-3 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-center gap-3">
+            <DownloadCloud className="h-5 w-5 shrink-0 text-emerald-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-white">AstroLink {availableUpdate.latestVersion} is available</p>
+              <p className="text-[10px] text-slate-400">Download the verified release from GitHub. Nothing installs silently.</p>
+              <a className="mt-1 inline-block text-[11px] font-semibold text-emerald-300 underline" href={availableUpdate.releaseUrl} target="_blank" rel="noreferrer">View release</a>
+            </div>
+            <button type="button" aria-label="Dismiss update" onClick={() => setAvailableUpdate(null)} className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+          </div>
+        </div>
+      )}
+      {commandError && (
+        <div role="alert" className="fixed top-20 left-1/2 -translate-x-1/2 z-[55] max-w-[92vw] rounded-2xl border border-amber-400/40 bg-slate-950/95 px-4 py-3 text-center text-xs text-amber-200 shadow-2xl">
+          <strong className="block text-amber-300">Sequence not started</strong>
+          <span>{commandError}</span>
+        </div>
+      )}
       {/* Top Bar Actions (Top-Left): Profile & Camera Hub */}
       <div className="fixed top-4 left-4 z-40 flex items-center gap-2">
         <button
@@ -300,6 +374,7 @@ export default function App() {
       <Viewport
         previewUrl={previewUrl}
         telemetry={telemetry}
+        isConnected={isConnected}
         isCrimson={isCrimson}
         revealDeepSky={revealDeepSky}
         clearCityGlow={clearCityGlow}
@@ -317,9 +392,17 @@ export default function App() {
         isCrimson={isCrimson}
         onToggleCrimson={toggleCrimson}
         revealDeepSky={revealDeepSky}
-        onToggleRevealDeepSky={() => setRevealDeepSky(!revealDeepSky)}
+        onToggleRevealDeepSky={() => {
+            const next = !revealDeepSky;
+            setRevealDeepSky(next);
+            updateProcessingSetting('revealDeepSky', next);
+          }}
         clearCityGlow={clearCityGlow}
-        onToggleClearCityGlow={() => setClearCityGlow(!clearCityGlow)}
+        onToggleClearCityGlow={() => {
+            const next = !clearCityGlow;
+            setClearCityGlow(next);
+            updateProcessingSetting('clearCityGlow', next);
+          }}
       />
 
       {/* Session Settings Sheet */}

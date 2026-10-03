@@ -3,7 +3,8 @@ uvicorn[standard]>=0.32.0
 websockets>=13.1
 numpy>=2.0.0
 scipy>=1.14.0
-opencv-python>=4.10.0
+# Headless builds avoid requiring libGL/X11 on field servers and containers.
+opencv-python-headless>=4.10.0
 rawpy>=0.23.0
 astropy>=6.1.0
 tifffile>=2024.9.20

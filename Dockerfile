@@ -44,12 +44,13 @@ COPY desktop_launcher.py ./
 # Copy pre-built React frontend assets from Stage 1 into frontend/dist
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Expose server port (8080 default for AstroLink)
+# Most providers inject PORT at runtime (Render/Railway/Koyeb/Cloud Run).
+# 8080 remains the local and Fly.io default.
 EXPOSE 8080
 
-# Health check endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/api/status || exit 1
+# Health check endpoint. The shell form lets hosted platforms override PORT.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-8080}/api/status" || exit 1'
 
-# Launch Uvicorn server binding to 0.0.0.0 for external network & hotspot access
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Launch Uvicorn on the provider-assigned port and bind externally.
+CMD ["sh", "-c", "exec uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

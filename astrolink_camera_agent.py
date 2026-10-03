@@ -102,9 +102,39 @@ def discover_server_via_mdns() -> Optional[str]:
     return None
 
 
-def upload_sub_exposure(server_url: str, file_path: Path) -> bool:
-    """Uploads a raw sub-exposure to the AstroLink server via multipart POST."""
+def wait_for_stable_file(file_path: Path, checks: int = 3, interval: float = 0.4) -> bool:
+    """Wait until a camera file stops growing before uploading it."""
+    previous = -1
+    stable = 0
+    for _ in range(max(1, checks + 2)):
+        try:
+            current = file_path.stat().st_size
+        except OSError:
+            return False
+        if current > 0 and current == previous:
+            stable += 1
+            if stable >= checks:
+                return True
+        else:
+            stable = 0
+        previous = current
+        time.sleep(interval)
+    return False
+
+
+def upload_sub_exposure(server_url: str, file_path: Path, api_token: Optional[str] = None) -> bool:
+    """Uploads a sub-exposure with bounded retries and optional API auth."""
     endpoint = f"{server_url.rstrip('/')}/api/upload"
+    if not file_path.is_file():
+        return False
+    try:
+        file_size = file_path.stat().st_size
+        if file_size == 0 or file_size > 128 * 1024 * 1024:
+            logger.warning("Skipping %s: invalid size (%d bytes)", file_path, file_size)
+            return False
+    except OSError as exc:
+        logger.warning("Cannot stat %s: %s", file_path, exc)
+        return False
     boundary = "----AstroLinkBoundary" + str(int(time.time() * 1000))
 
     try:
@@ -120,6 +150,8 @@ def upload_sub_exposure(server_url: str, file_path: Path) -> bool:
         req = urllib.request.Request(endpoint, data=body, method="POST")
         req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
         req.add_header("User-Agent", "AstroLink-Camera-Node/2.0")
+        if api_token:
+            req.add_header("Authorization", f"Bearer {api_token}")
 
         with urllib.request.urlopen(req, timeout=30.0) as response:
             if response.status in (200, 201):
@@ -136,7 +168,7 @@ def upload_sub_exposure(server_url: str, file_path: Path) -> bool:
         return False
 
 
-def run_gphoto2_tether(server_url: str, save_dir: Path) -> None:
+def run_gphoto2_tether(server_url: str, save_dir: Path, api_token: Optional[str] = None) -> None:
     """Runs gphoto2 in tethered capture mode and immediately sends captured frames."""
     gphoto = shutil.which("gphoto2")
     if not gphoto:
@@ -170,9 +202,12 @@ def run_gphoto2_tether(server_url: str, save_dir: Path) -> None:
 
             for nf in sorted(new_files, key=lambda f: f.stat().st_mtime):
                 if nf.suffix.lower() in SUPPORTED_EXTENSIONS:
-                    # Give camera time to finalize file writing
-                    time.sleep(0.3)
-                    upload_sub_exposure(server_url, nf)
+                    # Cameras write large files incrementally; never upload a
+                    # partially written exposure.
+                    if wait_for_stable_file(nf):
+                        upload_sub_exposure(server_url, nf, api_token)
+                    else:
+                        logger.warning("Timed out waiting for camera file: %s", nf)
                 seen_files.add(nf)
 
     except KeyboardInterrupt:
@@ -180,7 +215,7 @@ def run_gphoto2_tether(server_url: str, save_dir: Path) -> None:
         proc.terminate()
 
 
-def run_folder_watch(server_url: str, watch_dir: Path) -> None:
+def run_folder_watch(server_url: str, watch_dir: Path, api_token: Optional[str] = None) -> None:
     """Monitors a local folder or SD card mount for new sub-exposures."""
     logger.info("Watching directory for new sub-exposures: %s", watch_dir.resolve())
     logger.info("Ready! Any photo saved here will be streamed to the AstroLink live stack.")
@@ -195,8 +230,10 @@ def run_folder_watch(server_url: str, watch_dir: Path) -> None:
 
             for nf in sorted(new_files, key=lambda f: f.stat().st_mtime):
                 if nf.suffix.lower() in SUPPORTED_EXTENSIONS:
-                    time.sleep(0.5)  # Wait for file write to complete
-                    upload_sub_exposure(server_url, nf)
+                    if wait_for_stable_file(nf):
+                        upload_sub_exposure(server_url, nf, api_token)
+                    else:
+                        logger.warning("Timed out waiting for watched file: %s", nf)
                 seen_files.add(nf)
     except KeyboardInterrupt:
         logger.info("Exiting folder watch...")
@@ -223,8 +260,14 @@ def main():
         action="store_true",
         help="Force gphoto2 USB tethered capture mode.",
     )
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("ASTROLINK_API_TOKEN"),
+        help="Optional API token (or set ASTROLINK_API_TOKEN).",
+    )
 
     args = parser.parse_args()
+    api_token = args.token
 
     print("=" * 60)
     print("   AstroLink Multi-OS Camera Bridge (Zero-Cloud Field Agent)   ")
@@ -247,17 +290,17 @@ def main():
     if args.watch:
         watch_path = Path(args.watch)
         watch_path.mkdir(parents=True, exist_ok=True)
-        run_folder_watch(server_url, watch_path)
+        run_folder_watch(server_url, watch_path, api_token)
     elif args.tether or shutil.which("gphoto2"):
         capture_dir = Path("./captured_sub_exposures")
         capture_dir.mkdir(parents=True, exist_ok=True)
-        run_gphoto2_tether(server_url, capture_dir)
+        run_gphoto2_tether(server_url, capture_dir, api_token)
     else:
         # Default fallback to watching a local folder
         capture_dir = Path("./astro_hot_folder")
         capture_dir.mkdir(parents=True, exist_ok=True)
         logger.info("No gphoto2 CLI detected. Armed in Hot-Folder Watch mode: %s", capture_dir.resolve())
-        run_folder_watch(server_url, capture_dir)
+        run_folder_watch(server_url, capture_dir, api_token)
 
 
 if __name__ == "__main__":

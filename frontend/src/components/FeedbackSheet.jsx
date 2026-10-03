@@ -1,3 +1,4 @@
+import { adminApiFetch } from '../utils/api';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageCircle,
@@ -177,7 +178,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
 
     setIsLoadingReports(true);
     try {
-      const res = await fetch(`${backendUrl || ''}/api/feedback/track`, {
+      const res = await adminApiFetch(`${backendUrl || ''}/api/feedback/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
@@ -207,7 +208,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
     soundEngine.playClick();
 
     try {
-      const res = await fetch(`${backendUrl || ''}/api/feedback`, {
+      const res = await adminApiFetch(`${backendUrl || ''}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

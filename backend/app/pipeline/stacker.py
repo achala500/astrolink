@@ -82,16 +82,26 @@ class WelfordStacker:
         Returns:
             Total count of frames fed to the stacker so far.
         """
-        x = frame.astype(self.dtype, copy=False)
+        if not isinstance(frame, np.ndarray) or frame.ndim not in (2, 3):
+            raise ValueError("frame must be a 2D grayscale or 3D color numpy array")
+        if not np.issubdtype(frame.dtype, np.number):
+            raise TypeError("frame must contain numeric pixel values")
+
+        x = np.nan_to_num(frame.astype(self.dtype, copy=False), nan=0.0, posinf=1.0, neginf=0.0)
 
         if self.mean is None or self.counts is None or self.m2 is None:
             self._init_buffers(x.shape)
+        elif self.mean.shape != x.shape:
+            raise ValueError(f"Frame shape {x.shape} does not match stack shape {self.mean.shape}")
 
         if self.mean is None or self.counts is None or self.m2 is None:
             raise RuntimeError("Stacker internal state buffers were not initialized correctly.")
 
-        # Mask of pixels to include
+        # Mask of pixels to include. Reject mismatched masks rather than relying
+        # on numpy broadcasting (which can silently corrupt channel counts).
         if mask is not None:
+            if not isinstance(mask, np.ndarray) or mask.shape not in (x.shape, x.shape[:2]):
+                raise ValueError(f"mask shape {getattr(mask, 'shape', None)} does not match frame shape {x.shape}")
             if mask.ndim == 2 and x.ndim == 3:
                 # Expand 2D streak mask across color channels
                 mask_expanded = np.repeat(mask[:, :, np.newaxis], x.shape[2], axis=2)

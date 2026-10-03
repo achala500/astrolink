@@ -39,7 +39,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.11"
           cache: "pip"
 
       - name: Install Python Dependencies
@@ -49,7 +49,7 @@ jobs:
 
       - name: Run Pytest Test Suite
         run: |
-          python -m pytest backend/test_pipeline.py backend/test_server.py backend/test_licensing.py -v
+          PYTHONPATH=. python -m pytest backend/ -v --tb=short
 
   # ============================================================================
   # 2. Build Single-Executable Desktop Applications (Windows & Linux)
@@ -86,12 +86,18 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.11"
 
       - name: Install Build Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          # Keep desktop builds portable: RAW support is optional because rawpy
+          # has no wheel on every OS/Python combination. The server still uses
+          # the complete requirements.txt for full RAW/FITS support.
+          pip install --upgrade pip
+          pip install fastapi uvicorn[standard] websockets numpy opencv-python-headless tifffile zeroconf ifaddr cryptography python-multipart pyinstaller
+          pip install astropy || echo "Astropy unavailable; FITS support will report a clear optional-dependency error"
+          pip install rawpy || echo "rawpy unavailable; RAW support will report a clear optional-dependency error"
 
       - name: Compile Single Executable with PyInstaller
         run: |
@@ -107,17 +113,27 @@ jobs:
             cp dist/AstroLink dist/${{ matrix.release_asset }}
           fi
 
+      - name: Generate SHA-256 checksum
+        shell: bash
+        run: |
+          cd dist
+          sha256sum "${{ matrix.release_asset }}" > "${{ matrix.release_asset }}.sha256"
+
       - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.release_asset }}
-          path: dist/${{ matrix.release_asset }}
+          path: |
+            dist/${{ matrix.release_asset }}
+            dist/${{ matrix.release_asset }}.sha256
 
   # ============================================================================
   # 3. Publish Docker Image to GitHub Container Registry (GHCR)
   # ============================================================================
   publish-docker:
     needs: test
+    # Never publish images from an untrusted pull request.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     name: Publish Docker Image to GHCR
     runs-on: ubuntu-latest
     steps:
@@ -179,7 +195,9 @@ jobs:
         with:
           files: |
             AstroLink-windows-x64.exe
+            AstroLink-windows-x64.exe.sha256
             AstroLink-linux-x64
+            AstroLink-linux-x64.sha256
           draft: false
           prerelease: false
           generate_release_notes: true

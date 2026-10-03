@@ -17,20 +17,26 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hmac
 import io
 import json
 import logging
 import math
+import os
+import re
 import shutil
 import socket
 import sys
+import threading
+import urllib.error
+import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, Response, UploadFile, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -51,7 +57,7 @@ from backend.app.pipeline.gates import (
     compute_fwhm,
 )
 from backend.app.pipeline.gradient import remove_background_gradient
-from backend.app.pipeline.ingest import load_universal_frame
+from backend.app.pipeline.ingest import _normalize_array_to_float32, load_universal_frame
 from backend.app.pipeline.satellites import detect_satellite_streaks
 from backend.app.pipeline.stacker import WelfordStacker
 from backend.app.pipeline.stretch import auto_stretch
@@ -59,6 +65,48 @@ from backend.app.pipeline.stretch import auto_stretch
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("astrolink.server")
+APP_VERSION = "0.1.4"
+UPDATE_REPOSITORY = "achala500/astrolink"
+MAX_UPLOAD_BYTES = 128 * 1024 * 1024  # protect the field station from accidental huge uploads
+
+def _extract_bearer_token(request: Request) -> str:
+    supplied = request.headers.get("authorization", "")
+    if supplied.lower().startswith("bearer "):
+        return supplied[7:].strip()
+    return ""
+
+
+def _require_api_token(request: Request) -> None:
+    """Protect state-changing/data endpoints when API auth is configured."""
+    expected = os.environ.get("ASTROLINK_API_TOKEN", "").strip()
+    if expected and not hmac.compare_digest(_extract_bearer_token(request), expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API authentication required")
+
+
+def _require_ws_token(websocket: WebSocket) -> None:
+    expected = os.environ.get("ASTROLINK_API_TOKEN", "").strip()
+    if not expected:
+        return
+    supplied = websocket.query_params.get("token", "")
+    auth = websocket.headers.get("authorization", "")
+    if not supplied and auth.lower().startswith("bearer "):
+        supplied = auth[7:].strip()
+    if not supplied or not hmac.compare_digest(supplied, expected):
+        raise RuntimeError("WebSocket authentication required")
+
+
+def _require_admin_token(request: Request) -> None:
+    """Protect management/feedback endpoints when deployed publicly.
+
+    Local installations remain frictionless when no token is configured. Cloud
+    operators should set ASTROLINK_ADMIN_TOKEN and send it as a Bearer token.
+    """
+    expected = os.environ.get("ASTROLINK_ADMIN_TOKEN", "").strip()
+    if not expected:
+        return
+    supplied = _extract_bearer_token(request)
+    if not supplied or not hmac.compare_digest(supplied, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Administrator authentication required")
 
 
 # =====================================================================
@@ -122,9 +170,76 @@ class AstrophotographySession:
         self.last_preview_webp_b64: Optional[str] = None
         self.last_preview_webp_bytes: Optional[bytes] = None
         self.last_frame_name: Optional[str] = None
+        self.reveal_deep_sky = True
+        self.clear_city_glow = True
+        # Uploads and camera callbacks can arrive on different threads. The
+        # stacker is stateful, so serialize a complete frame transaction.
+        self._lock = threading.RLock()
+        configured_session = os.environ.get("ASTROLINK_SESSION_FILE", "").strip()
+        self._session_file = Path(configured_session).expanduser() if configured_session else None
+        self._load_persisted_session()
+
+    def _load_persisted_session(self) -> None:
+        """Restore an optional session snapshot from a mounted persistent volume."""
+        if not self._session_file or not self._session_file.is_file():
+            return
+        try:
+            with np.load(self._session_file, allow_pickle=False) as saved:
+                shape = tuple(int(x) for x in saved["shape"])
+                if len(shape) not in (2, 3) or any(dim <= 0 for dim in shape) or int(np.prod(shape)) > 100_000_000:
+                    raise ValueError("persisted frame shape is invalid or too large")
+                mean = saved["mean"]
+                m2 = saved["m2"]
+                counts = saved["counts"]
+                if mean.shape != shape or m2.shape != shape or counts.shape != shape:
+                    raise ValueError("persisted accumulator shapes do not match")
+                self.stacker._init_buffers(shape)
+                self.stacker.mean = mean.astype(np.float32)
+                self.stacker.m2 = m2.astype(np.float32)
+                self.stacker.counts = counts.astype(np.uint32)
+                if not np.isfinite(self.stacker.mean).all() or not np.isfinite(self.stacker.m2).all():
+                    raise ValueError("persisted accumulator contains non-finite values")
+                self.stacker.total_frames_processed = int(saved["total_frames"])
+                ref_frame = saved["ref_frame"]
+                if ref_frame.shape != shape or not np.isfinite(ref_frame).all():
+                    raise ValueError("persisted reference frame is invalid")
+                self.ref_frame = ref_frame.astype(np.float32)
+                self.total_exp_seconds = float(saved["total_exp_seconds"])
+                self.last_fwhm = float(saved["last_fwhm"])
+                logger.info("Restored persisted AstroLink session (%d frames)", self.stacker.total_frames_processed)
+        except Exception as exc:
+            logger.warning("Ignoring invalid persisted session snapshot: %s", exc)
+
+    def _persist_session(self) -> None:
+        if not self._session_file or self.stacker.mean is None or self.stacker.m2 is None or self.stacker.counts is None or self.ref_frame is None:
+            return
+        self._session_file.parent.mkdir(parents=True, exist_ok=True)
+        temp = self._session_file.with_suffix(self._session_file.suffix + ".tmp")
+        try:
+            np.savez_compressed(temp, shape=np.asarray(self.stacker.mean.shape, dtype=np.int64), mean=self.stacker.mean, m2=self.stacker.m2, counts=self.stacker.counts, total_frames=np.asarray(self.stacker.total_frames_processed), ref_frame=self.ref_frame, total_exp_seconds=np.asarray(self.total_exp_seconds), last_fwhm=np.asarray(self.last_fwhm))
+            generated = Path(str(temp) + ".npz")
+            generated.replace(temp)
+            temp.replace(self._session_file)
+        except Exception as exc:
+            logger.warning("Could not persist session snapshot: %s", exc)
+            temp.unlink(missing_ok=True)
+            Path(str(temp) + ".npz").unlink(missing_ok=True)
+
+    def set_processing_options(self, reveal_deep_sky: Optional[bool] = None, clear_city_glow: Optional[bool] = None) -> Dict[str, bool]:
+        """Updates display processing options for future previews."""
+        with self._lock:
+            if reveal_deep_sky is not None:
+                self.reveal_deep_sky = bool(reveal_deep_sky)
+            if clear_city_glow is not None:
+                self.clear_city_glow = bool(clear_city_glow)
+            return {"revealDeepSky": self.reveal_deep_sky, "clearCityGlow": self.clear_city_glow}
 
     def reset(self) -> None:
-        """Resets the live stacker and telemetry."""
+        """Resets the live stacker and telemetry atomically."""
+        with self._lock:
+            self._reset_unlocked()
+
+    def _reset_unlocked(self) -> None:
         self.stacker.reset()
         self.fwhm_tracker = RollingFWHMTracker(maxlen=5, blur_threshold_ratio=0.25)
         self.ref_frame = None
@@ -134,8 +249,20 @@ class AstrophotographySession:
         self.last_preview_webp_b64 = None
         self.last_preview_webp_bytes = None
         self.last_frame_name = None
+        if self._session_file:
+            self._session_file.unlink(missing_ok=True)
 
     def process_sub_exposure(
+        self,
+        image_bytes: Any,
+        filename: str = "frame.jpg",
+        sub_exp_seconds: float = 30.0,
+    ) -> Dict[str, Any]:
+        """Processes one frame atomically across upload and camera threads."""
+        with self._lock:
+            return self._process_sub_exposure(image_bytes, filename, sub_exp_seconds)
+
+    def _process_sub_exposure(
         self,
         image_bytes: Any,
         filename: str = "frame.jpg",
@@ -165,11 +292,14 @@ class AstrophotographySession:
         # 1. Universal format decoding (FITS, RAW, Linear DNG, TIFF, JPEG, PNG, WebP)
         # Guarantees standard 3-channel (H, W, 3) float32 in range [0.0, 1.0]
         if isinstance(image_bytes, np.ndarray):
-            frame = image_bytes.astype(np.float32)
-            if frame.max() > 1.0:
-                frame /= 255.0
+            if image_bytes.ndim not in (2, 3):
+                raise ValueError(f"Expected a 2D or 3D frame, got shape {image_bytes.shape}")
+            frame = _normalize_array_to_float32(image_bytes)
         else:
             frame = load_universal_frame(image_bytes)
+
+        if frame.size == 0 or not np.isfinite(frame).all():
+            raise ValueError("Frame contains no usable finite pixel data")
 
         # Single-channel 2D grayscale for star gates, streak detection, and registration
         if frame.ndim == 3:
@@ -218,13 +348,21 @@ class AstrophotographySession:
         self.stacker.add_frame(aligned_frame, mask=streak_mask)
         self.total_exp_seconds += sub_exp_seconds
         self.last_frame_name = filename
+        self._persist_session()
 
-        # 7. Background Gradient Removal
+        # 7. Optional background-gradient removal. The UI controls are now
+        # functional rather than merely changing their visual state.
         stacked_raw = self.stacker.get_result()
-        clean_stacked = remove_background_gradient(stacked_raw, order=2)
+        clean_stacked = (
+            remove_background_gradient(stacked_raw, order=2)
+            if self.clear_city_glow else stacked_raw
+        )
 
-        # 8. Nonlinear Display AutoStretch (MTF + Saturation)
-        stretched_preview = auto_stretch(clean_stacked, target_bg=0.25, preserve_saturation=(clean_stacked.ndim == 3))
+        # 8. Optional nonlinear display stretch (the exported stack remains linear).
+        stretched_preview = (
+            auto_stretch(clean_stacked, target_bg=0.25, preserve_saturation=(clean_stacked.ndim == 3))
+            if self.reveal_deep_sky else np.clip(clean_stacked * 255.0, 0, 255).astype(np.uint8)
+        )
 
         # 9. Scale to 1080p display preview
         prev_h, prev_w = stretched_preview.shape[:2]
@@ -236,8 +374,14 @@ class AstrophotographySession:
         else:
             preview_1080p = stretched_preview
 
-        # Encode to WebP
-        ok, webp_buffer = cv2.imencode(".webp", preview_1080p, [cv2.IMWRITE_WEBP_QUALITY, 85])
+        # OpenCV expects BGR when encoding color images; the ingestion pipeline
+        # uses RGB. Convert here so red/blue channels are not swapped in previews.
+        preview_for_encoding = (
+            cv2.cvtColor(preview_1080p, cv2.COLOR_RGB2BGR)
+            if preview_1080p.ndim == 3 and preview_1080p.shape[2] == 3
+            else preview_1080p
+        )
+        ok, webp_buffer = cv2.imencode(".webp", preview_for_encoding, [cv2.IMWRITE_WEBP_QUALITY, 85])
         if ok:
             self.last_preview_webp_bytes = webp_buffer.tobytes()
             b64_str = base64.b64encode(self.last_preview_webp_bytes).decode("ascii")
@@ -255,6 +399,8 @@ class AstrophotographySession:
             "fwhm": self.last_fwhm,
             "snrGain": snr_gain,
             "alertMessage": self.last_alert_message,
+            "revealDeepSky": self.reveal_deep_sky,
+            "clearCityGlow": self.clear_city_glow,
         }
 
         return {
@@ -338,7 +484,7 @@ async def lifespan(app: FastAPI):
                 type_="_http._tcp.local.",
                 name="astrolink._http._tcp.local.",
                 addresses=[socket.inet_aton(local_ip)],
-                port=8080,
+                port=int(os.environ.get("ASTROLINK_PORT", os.environ.get("PORT", "8080"))),
                 server="astrolink.local.",
                 properties={"path": "/"},
             )
@@ -347,8 +493,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Zero-Config mDNS registration not available or skipped: %s", e)
 
-    import threading
-    threading.Thread(target=_start_mdns, daemon=True, name="mDNS-Broadcast").start()
+    if os.environ.get("ASTROLINK_DISABLE_MDNS", "").lower() not in {"1", "true", "yes"}:
+        threading.Thread(target=_start_mdns, daemon=True, name="mDNS-Broadcast").start()
+    else:
+        logger.info("mDNS disabled by ASTROLINK_DISABLE_MDNS")
 
     # Initialize Hardware Tethering Daemon
     def on_tether_frame(frame: CapturedFrame) -> None:
@@ -356,7 +504,10 @@ async def lifespan(app: FastAPI):
         _on_intervalometer_frame_captured(frame.data, frame.filename, 30.0)
 
     tether_daemon = GPhotoTetherDaemon(on_frame_callback=on_tether_frame, simulate=True)
-    tether_daemon.start()
+    if os.environ.get("ASTROLINK_DISABLE_HARDWARE", "").lower() not in {"1", "true", "yes"}:
+        tether_daemon.start()
+    else:
+        logger.info("Camera tethering disabled by ASTROLINK_DISABLE_HARDWARE")
 
     yield
 
@@ -380,13 +531,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS setup allowing all origins
+# Same-origin is the normal deployment. Explicit origins are supported for a
+# separate frontend; wildcard access can be enabled only for local/offline use.
+configured_origins = [origin.strip() for origin in os.environ.get("ASTROLINK_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=configured_origins or ["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -429,16 +582,24 @@ async def captive_windows():
 
 
 @app.post("/api/upload")
-async def upload_frame(file: UploadFile = File(...)):
+async def upload_frame(request: Request, file: UploadFile = File(...)):
     """Ingests multipart sub-exposures through universal decoding into WelfordStacker.
 
     Supports FITS, DSLR RAWs, Linear DNGs, TIFF, JPEG, PNG, and WebP formats.
     Broadcasts real-time telemetry and 1080p WebP previews across WebSocket clients.
     """
+    _require_api_token(request)
     try:
-        data = await file.read()
-        filename = file.filename or "sub_exposure.jpg"
+        data = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Frame exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MiB upload limit",
+            )
+        if not data:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded frame is empty")
 
+        filename = file.filename or "sub_exposure.jpg"
         result = session.process_sub_exposure(data, filename=filename)
 
         if not result.get("accepted"):
@@ -470,17 +631,23 @@ async def upload_frame(file: UploadFile = File(...)):
             "preview": preview,
         }
 
+    except HTTPException:
+        raise
+    except (ValueError, ImportError) as e:
+        logger.warning("Rejected frame upload: %s", e)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e)) from e
     except Exception as e:
         logger.error("Failed to ingest frame: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Frame ingestion failed: {str(e)}",
-        )
+            detail="Frame ingestion failed unexpectedly",
+        ) from e
 
 
 @app.get("/api/export")
-async def export_master_stack():
+async def export_master_stack(request: Request):
     """Exports current master stack as an uncompressed 16-bit TIFF using tifffile."""
+    _require_api_token(request)
     if session.stacker.mean is None or session.stacker.total_frames_processed == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -517,6 +684,11 @@ async def export_master_stack():
 @app.websocket("/ws")
 async def websocket_telemetry(websocket: WebSocket):
     """Streams real-time telemetry/previews and executes hardware camera control commands."""
+    try:
+        _require_ws_token(websocket)
+    except RuntimeError:
+        await websocket.close(code=1008, reason="Authentication required")
+        return
     await ws_manager.connect(websocket)
 
     # Dispatch current telemetry state upon connection
@@ -531,6 +703,9 @@ async def websocket_telemetry(websocket: WebSocket):
         "alertMessage": session.last_alert_message,
         "preview": session.last_preview_webp_b64,
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     }
     await websocket.send_json(init_payload)
 
@@ -550,9 +725,16 @@ async def websocket_telemetry(websocket: WebSocket):
 
             # Handle WebSocket Commands
             if command == "START_SEQUENCE":
-                exposure_seconds = float(cmd_data.get("exposure_seconds", 30.0))
-                frame_count = int(cmd_data.get("frame_count", 10))
-                delay_seconds = float(cmd_data.get("delay_seconds", 2.0))
+                try:
+                    exposure_seconds = float(cmd_data.get("exposure_seconds", 30.0))
+                    frame_count = int(cmd_data.get("frame_count", 10))
+                    delay_seconds = float(cmd_data.get("delay_seconds", 2.0))
+                except (TypeError, ValueError):
+                    await websocket.send_json({"type": "command_response", "command": "START_SEQUENCE", "success": False, "error": "Exposure, frame count, and delay must be numeric"})
+                    continue
+                if not (0.1 <= exposure_seconds <= 86400 and 1 <= frame_count <= 10000 and 0 <= delay_seconds <= 86400):
+                    await websocket.send_json({"type": "command_response", "command": "START_SEQUENCE", "success": False, "error": "Sequence values are outside supported limits"})
+                    continue
                 iso = cmd_data.get("iso", None)
                 bulb_mode = bool(cmd_data.get("bulb_mode", False))
 
@@ -568,6 +750,9 @@ async def websocket_telemetry(websocket: WebSocket):
                     "command": "START_SEQUENCE",
                     "success": started,
                     "running": intervalometer.is_running,
+                    "cameraMode": intervalometer.camera_mode,
+                    "cameraConnected": intervalometer.is_connected,
+                    "error": (intervalometer.last_error or "No shutter-capable camera connected") if not started else None,
                 })
 
             elif command == "STOP_SEQUENCE":
@@ -590,6 +775,9 @@ async def websocket_telemetry(websocket: WebSocket):
                     "alertMessage": None,
                     "preview": None,
                     "intervalometerRunning": intervalometer.is_running,
+                    "cameraMode": intervalometer.camera_mode,
+                    "cameraConnected": intervalometer.is_connected,
+                    "cameraError": intervalometer.last_error,
                 }
                 await ws_manager.broadcast_json(reset_payload)
                 await websocket.send_json({
@@ -621,12 +809,65 @@ async def get_status():
         "alertMessage": session.last_alert_message,
         "activeClients": len(ws_manager.active_connections),
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     }
 
 
+@app.get("/api/settings")
+async def get_processing_settings():
+    """Returns the active preview-processing settings."""
+    return session.set_processing_options()
+
+
+@app.get("/api/update/check")
+async def check_for_updates():
+    """Checks GitHub Releases without exposing credentials or uploading user data.
+
+    This is a notification check, not a silent binary replacement. Automatic
+    installation is intentionally avoided because unsigned binaries cannot be
+    safely trusted; the UI links to the signed/verified release page instead.
+    """
+    if os.environ.get("ASTROLINK_DISABLE_UPDATE_CHECK", "").lower() in {"1", "true", "yes"}:
+        return {"currentVersion": APP_VERSION, "updateAvailable": False, "disabled": True}
+    url = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
+    try:
+        request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "AstroLink-Update-Checker"})
+        with urllib.request.urlopen(request, timeout=3.0) as response:
+            release = json.loads(response.read().decode("utf-8"))
+        latest_tag = str(release.get("tag_name", "")).lstrip("v")
+        def version_tuple(value: str) -> tuple[int, ...]:
+            return tuple(int(part) for part in re.findall(r"\d+", value)[:4]) or (0,)
+        assets = [{"name": a.get("name"), "url": a.get("browser_download_url")} for a in release.get("assets", [])]
+        return {
+            "currentVersion": APP_VERSION,
+            "latestVersion": latest_tag,
+            "updateAvailable": version_tuple(latest_tag) > version_tuple(APP_VERSION),
+            "releaseUrl": release.get("html_url"),
+            "assets": assets,
+        }
+    except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        logger.info("Update check unavailable: %s", exc)
+        return {"currentVersion": APP_VERSION, "updateAvailable": False, "available": False}
+
+
+@app.post("/api/settings")
+async def update_processing_settings(payload: Dict[str, Any], request: Request):
+    """Updates preview-processing settings without changing the linear master."""
+    _require_api_token(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Settings payload must be an object")
+    return session.set_processing_options(
+        reveal_deep_sky=payload.get("revealDeepSky"),
+        clear_city_glow=payload.get("clearCityGlow"),
+    )
+
+
 @app.post("/api/reset")
-async def reset_session():
+async def reset_session(request: Request):
     """Resets current stacking session."""
+    _require_api_token(request)
     session.reset()
     payload = {
         "type": "telemetry",
@@ -637,6 +878,9 @@ async def reset_session():
         "alertMessage": None,
         "preview": None,
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     }
     await ws_manager.broadcast_json(payload)
     return {"status": "session_reset"}
@@ -649,8 +893,9 @@ async def get_license_status():
 
 
 @app.post("/api/license/activate")
-async def activate_license(payload: Dict[str, Any]):
+async def activate_license(payload: Dict[str, Any], request: Request):
     """Activates an offline cryptographic license key."""
+    _require_api_token(request)
     key = payload.get("key") or payload.get("license_key") or ""
     if not key:
         raise HTTPException(status_code=400, detail="Missing license key in payload")
@@ -674,6 +919,9 @@ async def activate_license(payload: Dict[str, Any]):
         "preview": session.last_preview_webp_b64,
         "license": lic_status.to_dict(),
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     })
 
     return {
@@ -683,8 +931,9 @@ async def activate_license(payload: Dict[str, Any]):
 
 
 @app.post("/api/license/deactivate")
-async def deactivate_license():
+async def deactivate_license(request: Request):
     """Deactivates active license and reverts to community trial mode."""
+    _require_api_token(request)
     license_manager.deactivate()
     return {
         "status": "deactivated",
@@ -698,12 +947,13 @@ async def deactivate_license():
 # ==========================================================================
 
 @app.get("/api/camera/detect")
-async def detect_connected_cameras():
+async def detect_connected_cameras(request: Request):
     """Scans USB and local mounts across Windows, Linux, and macOS for cameras.
     
     Identifies DSLR PTP (Canon, Nikon, Sony), Astro CMOS (ZWO, QHY, SVBONY),
     and SD Card DCIM hot-folders without requiring a web browser on the camera.
     """
+    _require_api_token(request)
     discovered = camera_detector.scan()
     return {
         "cameras": [c.to_dict() for c in discovered],
@@ -719,8 +969,9 @@ async def detect_connected_cameras():
 
 
 @app.get("/api/camera/status")
-async def get_camera_status():
+async def get_camera_status(request: Request):
     """Returns real-time status of intervalometer and camera tether connection."""
+    _require_api_token(request)
     return {
         "connected": intervalometer.is_connected,
         "running": intervalometer.is_running,
@@ -756,16 +1007,22 @@ async def submit_feedback(payload: Dict[str, Any]):
         "snrGain": round(math.sqrt(max(1, stack_count)), 2),
         "alertMessage": session.last_alert_message,
         "intervalometerRunning": intervalometer.is_running,
+        "cameraMode": intervalometer.camera_mode,
+        "cameraConnected": intervalometer.is_connected,
+        "cameraError": intervalometer.last_error,
     }
 
-    entry = feedback_manager.submit(
-        category=category,
-        message=message,
-        severity=severity,
-        device_info=device_info,
-        telemetry_snapshot=telemetry_snapshot,
-        attachments=attachments,
-    )
+    try:
+        entry = feedback_manager.submit(
+            category=category,
+            message=message,
+            severity=severity,
+            device_info=device_info,
+            telemetry_snapshot=telemetry_snapshot,
+            attachments=attachments,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {
         "status": "submitted",
         "feedback_id": entry.id,
@@ -775,8 +1032,9 @@ async def submit_feedback(payload: Dict[str, Any]):
 
 
 @app.get("/api/feedback/attachment/{filename}")
-async def get_feedback_attachment(filename: str):
+async def get_feedback_attachment(filename: str, request: Request):
     """Safely serves an attached screenshot or diagnostic image."""
+    _require_admin_token(request)
     path = feedback_manager.get_attachment_path(filename)
     if not path or not path.is_file():
         raise HTTPException(status_code=404, detail="Attachment not found")
@@ -784,8 +1042,9 @@ async def get_feedback_attachment(filename: str):
 
 
 @app.get("/api/feedback")
-async def get_feedback():
+async def get_feedback(request: Request):
     """Returns all unresolved feedback entries and statistics."""
+    _require_admin_token(request)
     return {
         "entries": feedback_manager.get_all(),
         "stats": feedback_manager.get_stats(),
@@ -793,14 +1052,17 @@ async def get_feedback():
 
 
 @app.get("/api/feedback/export")
-async def export_feedback_for_jules():
+async def export_feedback_for_jules(request: Request):
     """Exports unresolved, pending feedback as formatted GitHub Issues for Jules."""
+    _require_admin_token(request)
     return {"issues": feedback_manager.export_for_jules()}
 
 
 @app.post("/api/feedback/track")
-async def track_user_feedback(payload: Dict[str, Any]):
-    """Returns status, GitHub issue links, and resolution notes for user-submitted ticket IDs."""
+async def track_user_feedback(payload: Dict[str, Any], request: Request):
+    """Returns only reports matching caller-provided opaque feedback IDs."""
+    # Tracking is intentionally public: IDs are random and users need to check
+    # their own ticket without exposing the full feedback database.
     ids = payload.get("ids", [])
     if not isinstance(ids, list):
         raise HTTPException(status_code=400, detail="Expected list of ticket IDs")
@@ -809,8 +1071,9 @@ async def track_user_feedback(payload: Dict[str, Any]):
 
 
 @app.post("/api/feedback/update")
-async def update_feedback_status(payload: Dict[str, Any]):
+async def update_feedback_status(payload: Dict[str, Any], request: Request):
     """Updates ticket status (e.g. when Jules triages or closes an issue)."""
+    _require_admin_token(request)
     feedback_id = payload.get("id")
     new_status = payload.get("status")
     issue_number = payload.get("issue_number")
@@ -830,8 +1093,9 @@ async def update_feedback_status(payload: Dict[str, Any]):
 
 
 @app.post("/api/feedback/clear")
-async def clear_resolved_feedback():
+async def clear_resolved_feedback(request: Request):
     """Clears all resolved feedback entries (called after Jules processes them)."""
+    _require_admin_token(request)
     cleared = feedback_manager.clear_resolved()
     return {"status": "cleared", "count": cleared}
 
