@@ -94,7 +94,7 @@ npm run build   # Production bundle in frontend/dist
 
 ## Downloads and Desktop Packaging
 
-Official tagged builds are published on the [GitHub Releases page](https://github.com/achala500/astrolink/releases) when a version tag is created. Releases include Windows, Linux, and macOS binaries plus SHA-256 checksum files. Read [RELEASE.md](RELEASE.md) before installing.
+Official tagged builds are published on the [GitHub Releases page](https://github.com/achala500/astrolink/releases) when a version tag is created. Releases include Windows and Linux binaries plus SHA-256 checksum files. macOS source builds are supported; a macOS binary is published when a compatible runner is available. Read [RELEASE.md](RELEASE.md) before installing.
 
 No unsigned Windows executable can be guaranteed to avoid every Defender/SmartScreen reputation warning. The release build disables UPX compression, avoids persistence and obfuscation, and publishes checksums. An organization-owned Authenticode certificate is required for a publisher-verified Windows installer.
 

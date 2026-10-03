@@ -6,7 +6,7 @@ Tagged GitHub releases contain platform-specific binaries and SHA-256 checksum f
 
 - `AstroLink-windows-x64.exe`
 - `AstroLink-linux-x64`
-- `AstroLink-macos-x64`
+- macOS builds are supported from source; a hosted macOS binary is added when a macOS runner is available
 
 The binaries are built from the tagged source by GitHub Actions. The build disables UPX because compressed PyInstaller executables are more likely to trigger antivirus heuristics.
 
