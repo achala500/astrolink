@@ -147,9 +147,14 @@ python -m backend.app.licensing verify "<base64-license-key>"
 
 ---
 
-## Free Multi-Platform Cloud Hosting
+## Multi-Cloud Hosting and Field-Station Architecture
 
-AstroLink can be deployed on **6 free cloud platforms** for remote EAA demonstrations and team sharing:
+AstroLink has two deliberately different operating modes:
+
+- **Field station mode (recommended for real cameras):** run the service on the laptop/Raspberry Pi connected to the camera. USB tethering, gphoto2, mDNS, and the local intervalometer stay on the same network as the hardware.
+- **Cloud demo mode:** deploy the container for remote viewing, uploads, pipeline testing, licensing, and team sharing. Cloud providers cannot access a DSLR connected to your home or observatory, so camera control remains disabled unless the camera is physically attached to that cloud machine.
+
+The Docker image is provider-portable: it listens on the injected `PORT` value (falling back to `8080`) and exposes `/api/status` as a health check. AstroLink can be deployed on **6 cloud platforms** for remote EAA demonstrations and team sharing:
 
 | Platform | Free Tier | Deploy Method | Config File |
 |---|---|---|---|
@@ -158,7 +163,21 @@ AstroLink can be deployed on **6 free cloud platforms** for remote EAA demonstra
 | **Railway.app** | \$5 credit/month | Connect GitHub repo | `railway.json` |
 | **Koyeb** | 1 free nano instance | Connect GitHub repo | `koyeb.yaml` |
 | **Hugging Face Spaces** | 16GB RAM + 2 vCPUs | Push as Docker Space | `Dockerfile` |
-| **GitHub Container Registry** | Unlimited public images | Auto-published via CI/CD | `.github/workflows/ci-cd.yml` |
+| **GitHub Container Registry** | Public image hosting | Auto-published via CI/CD | `.github/workflows/ci-cd.yml` |
+
+> Free plans and quotas change frequently. Treat Render/Koyeb/Fly as demo targets and do not rely on an ephemeral instance for irreplaceable astrophotography data. The live stack is intentionally in memory; export the TIFF after a session.
+
+### Deploy the portable container
+
+Build and smoke-test locally first:
+
+```bash
+docker build -t astrolink:local .
+docker run --rm -p 8080:8080 -e PORT=8080 astrolink:local
+curl http://localhost:8080/api/status
+```
+
+Every provider should wait for `GET /api/status` to return `200` before routing traffic. For a cloud deployment, use a private license key through `ASTROLINK_LICENSE`; never commit a generated license key or camera credentials.
 
 ### Option A: Render.com (Recommended — Zero Config)
 1. Go to [render.com/new](https://render.com/new) → **New Web Service**.
