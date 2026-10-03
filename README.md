@@ -1,6 +1,6 @@
 # AstroLink — Autonomous Field Stacking & EAA Field Station
 
-[![CI/CD](https://github.com/astrolink/astrolink/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/astrolink/astrolink/actions/workflows/ci-cd.yml)
+[![CI/CD](https://github.com/achala500/astrolink/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/achala500/astrolink/actions/workflows/ci-cd.yml)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
 [![React 18](https://img.shields.io/badge/React-18+-61DAFB.svg?logo=react)](https://react.dev)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4+-38B2AC.svg?logo=tailwind-css)](https://tailwindcss.com)
@@ -49,9 +49,13 @@ peaceful-kepler/
 ├── desktop_launcher.py     # Desktop launcher (starts Uvicorn & opens default browser)
 ├── astrolink.spec          # PyInstaller single-executable build specification
 ├── Dockerfile              # Multi-stage container for cloud deployment
+├── docker-compose.yml      # Local Docker Compose for development
 ├── render.yaml             # Render.com free web service blueprint
 ├── fly.toml                # Fly.io deployment configuration
-├── .github/workflows/      # Automated CI/CD & multi-platform binary releases
+├── railway.json            # Railway.app deployment configuration
+├── koyeb.yaml              # Koyeb free tier deployment
+├── Procfile                # Heroku-style process declaration
+├── .github/workflows/      # Automated CI/CD, multi-platform binaries & GHCR Docker publish
 ├── example_license.key     # Pre-signed valid offline lifetime license key
 └── requirements.txt        # Pinned Python dependencies
 ```
@@ -64,7 +68,7 @@ peaceful-kepler/
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/astrolink.git
+git clone https://github.com/achala500/astrolink.git
 cd astrolink
 
 # Install dependencies
@@ -145,49 +149,66 @@ python -m backend.app.licensing verify "<base64-license-key>"
 
 ## Free Multi-Platform Cloud Hosting
 
-You can deploy AstroLink on multiple free platforms for remote EAA demonstrations:
+AstroLink can be deployed on **6 free cloud platforms** for remote EAA demonstrations and team sharing:
 
-### Option A: Render.com (Free Web Service)
-1. Fork or push this repository to GitHub.
-2. Link your repository in [Render.com](https://render.com).
+| Platform | Free Tier | Deploy Method | Config File |
+|---|---|---|---|
+| **Render.com** | 750 hrs/month | Auto-deploy from GitHub | `render.yaml` |
+| **Fly.io** | 3 shared VMs | CLI `fly deploy` | `fly.toml` |
+| **Railway.app** | \$5 credit/month | Connect GitHub repo | `railway.json` |
+| **Koyeb** | 1 free nano instance | Connect GitHub repo | `koyeb.yaml` |
+| **Hugging Face Spaces** | 16GB RAM + 2 vCPUs | Push as Docker Space | `Dockerfile` |
+| **GitHub Container Registry** | Unlimited public images | Auto-published via CI/CD | `.github/workflows/ci-cd.yml` |
+
+### Option A: Render.com (Recommended — Zero Config)
+1. Go to [render.com/new](https://render.com/new) → **New Web Service**.
+2. Connect your GitHub repository: `achala500/astrolink`.
 3. Render automatically detects `render.yaml` and builds the multi-stage Docker container.
+4. Live URL: `https://astrolink-field-station.onrender.com`
 
-### Option B: Fly.io (Free Tier)
+### Option B: Fly.io
 ```bash
-# Install flyctl
 curl -L https://fly.io/install.sh | sh
-
-# Launch application
+fly auth login
 fly launch --config fly.toml
 fly deploy
 ```
 
-### Option C: Hugging Face Spaces (Free 16GB RAM + 2 vCPUs)
-1. Create a new Space on [Hugging Face](https://huggingface.co/spaces).
+### Option C: Railway.app
+1. Go to [railway.app/new](https://railway.app/new) → **Deploy from GitHub Repo**.
+2. Select `achala500/astrolink`.
+3. Railway detects `railway.json` and `Dockerfile` automatically.
+
+### Option D: Koyeb
+1. Go to [app.koyeb.com](https://app.koyeb.com) → **Create App** → **GitHub**.
+2. Select `achala500/astrolink`, Koyeb builds from `Dockerfile`.
+
+### Option E: Hugging Face Spaces (Best for Science Demos)
+1. Create a new Space on [huggingface.co/spaces](https://huggingface.co/spaces).
 2. Select **Docker** as the SDK.
 3. Push this repo — Hugging Face will build the `Dockerfile` and host it with generous RAM for scientific stacking.
 
----
-
-## Pushing to GitHub
-
-To push this codebase to your own GitHub repository:
-
+### Option F: Docker (Self-Hosted / Any Cloud)
 ```bash
-# Initialize git and stage files
-git init
-git add .
-git commit -m "feat: complete AstroLink field station with offline licensing, PyInstaller spec, and cloud configs"
+# Pull pre-built image from GitHub Container Registry
+docker pull ghcr.io/achala500/astrolink:latest
+docker run -p 8080:8080 ghcr.io/achala500/astrolink:latest
 
-# Add your GitHub remote
-git remote add origin https://github.com/<your-username>/astrolink.git
-
-# Set main branch and push
-git branch -M main
-git push -u origin main
+# Or build & run locally with Docker Compose
+docker-compose up --build
 ```
 
-Once pushed, the included [GitHub Actions workflow](.github/workflows/ci-cd.yml) will automatically run tests and compile desktop binaries for releases.
+---
+
+## GitHub Repository
+
+**Repository**: [github.com/achala500/astrolink](https://github.com/achala500/astrolink)
+
+The included [GitHub Actions workflow](.github/workflows/ci-cd.yml) automatically:
+- ✅ Runs the full 20-test suite on every push
+- 📦 Builds Windows & Linux desktop binaries
+- 🐳 Publishes Docker images to GitHub Container Registry (GHCR)
+- 🚀 Creates GitHub Releases with binaries on version tags (`v*`)
 
 ---
 

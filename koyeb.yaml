@@ -1,0 +1,33 @@
+# Koyeb deployment configuration for AstroLink
+# Deploy: koyeb app create astrolink --docker "ghcr.io/achala500/astrolink:latest"
+# Or connect GitHub repo directly via Koyeb dashboard
+
+name: astrolink
+type: web
+docker:
+  dockerfile: Dockerfile
+regions:
+  - was  # Washington, D.C.
+instance_types:
+  - free  # Koyeb free tier: 512MB RAM, shared vCPU
+ports:
+  - port: 8080
+    protocol: http
+routes:
+  - path: /
+    port: 8080
+scaling:
+  min: 0
+  max: 1
+health_checks:
+  - type: http
+    port: 8080
+    path: /api/status
+    interval: 30
+    timeout: 5
+    retries: 3
+env:
+  - key: PORT
+    value: "8080"
+  - key: PYTHONUNBUFFERED
+    value: "1"
