@@ -165,6 +165,8 @@ class AstrophotographySession:
         self.last_preview_webp_b64: Optional[str] = None
         self.last_preview_webp_bytes: Optional[bytes] = None
         self.last_frame_name: Optional[str] = None
+        self.reveal_deep_sky = True
+        self.clear_city_glow = True
         # Uploads and camera callbacks can arrive on different threads. The
         # stacker is stateful, so serialize a complete frame transaction.
         self._lock = threading.RLock()
@@ -217,6 +219,15 @@ class AstrophotographySession:
             logger.warning("Could not persist session snapshot: %s", exc)
             temp.unlink(missing_ok=True)
             Path(str(temp) + ".npz").unlink(missing_ok=True)
+
+    def set_processing_options(self, reveal_deep_sky: Optional[bool] = None, clear_city_glow: Optional[bool] = None) -> Dict[str, bool]:
+        """Updates display processing options for future previews."""
+        with self._lock:
+            if reveal_deep_sky is not None:
+                self.reveal_deep_sky = bool(reveal_deep_sky)
+            if clear_city_glow is not None:
+                self.clear_city_glow = bool(clear_city_glow)
+            return {"revealDeepSky": self.reveal_deep_sky, "clearCityGlow": self.clear_city_glow}
 
     def reset(self) -> None:
         """Resets the live stacker and telemetry atomically."""
@@ -334,12 +345,19 @@ class AstrophotographySession:
         self.last_frame_name = filename
         self._persist_session()
 
-        # 7. Background Gradient Removal
+        # 7. Optional background-gradient removal. The UI controls are now
+        # functional rather than merely changing their visual state.
         stacked_raw = self.stacker.get_result()
-        clean_stacked = remove_background_gradient(stacked_raw, order=2)
+        clean_stacked = (
+            remove_background_gradient(stacked_raw, order=2)
+            if self.clear_city_glow else stacked_raw
+        )
 
-        # 8. Nonlinear Display AutoStretch (MTF + Saturation)
-        stretched_preview = auto_stretch(clean_stacked, target_bg=0.25, preserve_saturation=(clean_stacked.ndim == 3))
+        # 8. Optional nonlinear display stretch (the exported stack remains linear).
+        stretched_preview = (
+            auto_stretch(clean_stacked, target_bg=0.25, preserve_saturation=(clean_stacked.ndim == 3))
+            if self.reveal_deep_sky else np.clip(clean_stacked * 255.0, 0, 255).astype(np.uint8)
+        )
 
         # 9. Scale to 1080p display preview
         prev_h, prev_w = stretched_preview.shape[:2]
@@ -351,8 +369,14 @@ class AstrophotographySession:
         else:
             preview_1080p = stretched_preview
 
-        # Encode to WebP
-        ok, webp_buffer = cv2.imencode(".webp", preview_1080p, [cv2.IMWRITE_WEBP_QUALITY, 85])
+        # OpenCV expects BGR when encoding color images; the ingestion pipeline
+        # uses RGB. Convert here so red/blue channels are not swapped in previews.
+        preview_for_encoding = (
+            cv2.cvtColor(preview_1080p, cv2.COLOR_RGB2BGR)
+            if preview_1080p.ndim == 3 and preview_1080p.shape[2] == 3
+            else preview_1080p
+        )
+        ok, webp_buffer = cv2.imencode(".webp", preview_for_encoding, [cv2.IMWRITE_WEBP_QUALITY, 85])
         if ok:
             self.last_preview_webp_bytes = webp_buffer.tobytes()
             b64_str = base64.b64encode(self.last_preview_webp_bytes).decode("ascii")
@@ -370,6 +394,8 @@ class AstrophotographySession:
             "fwhm": self.last_fwhm,
             "snrGain": snr_gain,
             "alertMessage": self.last_alert_message,
+            "revealDeepSky": self.reveal_deep_sky,
+            "clearCityGlow": self.clear_city_glow,
         }
 
         return {
@@ -772,6 +798,24 @@ async def get_status():
     }
 
 
+@app.get("/api/settings")
+async def get_processing_settings():
+    """Returns the active preview-processing settings."""
+    return session.set_processing_options()
+
+
+@app.post("/api/settings")
+async def update_processing_settings(payload: Dict[str, Any], request: Request):
+    """Updates preview-processing settings without changing the linear master."""
+    _require_api_token(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="Settings payload must be an object")
+    return session.set_processing_options(
+        reveal_deep_sky=payload.get("revealDeepSky"),
+        clear_city_glow=payload.get("clearCityGlow"),
+    )
+
+
 @app.post("/api/reset")
 async def reset_session(request: Request):
     """Resets current stacking session."""
@@ -959,8 +1003,9 @@ async def export_feedback_for_jules(request: Request):
 
 @app.post("/api/feedback/track")
 async def track_user_feedback(payload: Dict[str, Any], request: Request):
-    """Returns status, GitHub issue links, and resolution notes for user-submitted ticket IDs."""
-    _require_admin_token(request)
+    """Returns only reports matching caller-provided opaque feedback IDs."""
+    # Tracking is intentionally public: IDs are random and users need to check
+    # their own ticket without exposing the full feedback database.
     ids = payload.get("ids", [])
     if not isinstance(ids, list):
         raise HTTPException(status_code=400, detail="Expected list of ticket IDs")

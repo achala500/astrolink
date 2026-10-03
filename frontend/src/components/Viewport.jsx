@@ -410,6 +410,7 @@ export default function Viewport({
     });
 
     let successCount = 0;
+    let failureMessages = [];
     for (let i = 0; i < validFiles.length; i++) {
       const file = validFiles[i];
       const formData = new FormData();
@@ -422,9 +423,19 @@ export default function Viewport({
         });
         if (res.ok) {
           successCount++;
+        } else {
+          let detail = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            detail = body.detail || body.details || body.reason || detail;
+          } catch {
+            // Keep the status fallback when the server did not return JSON.
+          }
+          failureMessages.push(`${file.name}: ${detail}`);
         }
       } catch (err) {
         console.error('File upload error:', err);
+        failureMessages.push(`${file.name}: network error`);
       }
 
       setUploadStatus({
@@ -434,10 +445,13 @@ export default function Viewport({
       });
     }
 
+    const resultText = failureMessages.length
+      ? `${successCount} stacked, ${failureMessages.length} rejected. ${failureMessages[0]}`
+      : `Successfully stacked ${successCount} sub-exposure(s)!`;
     setUploadStatus({
-      text: `Successfully stacked ${successCount} sub-exposure(s)!`,
+      text: resultText,
       progress: 100,
-      type: 'success'
+      type: failureMessages.length === validFiles.length ? 'error' : (failureMessages.length ? 'info' : 'success')
     });
 
     setTimeout(() => {

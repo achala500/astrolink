@@ -9,6 +9,7 @@ import FeedbackSheet from './components/FeedbackSheet';
 import AuthModal from './components/AuthModal';
 import CameraModal from './components/CameraModal';
 import { soundEngine } from './utils/audio';
+import { apiFetch } from './utils/api';
 
 export default function App() {
   // Theme & Display State
@@ -164,6 +165,19 @@ export default function App() {
     }
   };
 
+  // Sync preview controls with the server so a reload or second client does
+  // not silently use different processing settings.
+  useEffect(() => {
+    apiFetch('/api/settings')
+      .then((response) => response.ok ? response.json() : null)
+      .then((settings) => {
+        if (!settings) return;
+        if (typeof settings.revealDeepSky === 'boolean') setRevealDeepSky(settings.revealDeepSky);
+        if (typeof settings.clearCityGlow === 'boolean') setClearCityGlow(settings.clearCityGlow);
+      })
+      .catch(() => {});
+  }, []);
+
   // 2. Screen Wake Lock API (Keep phone display on during night session)
   useEffect(() => {
     const requestWakeLock = async () => {
@@ -211,6 +225,17 @@ export default function App() {
       );
     }
   }, []);
+
+  const updateProcessingSetting = (name, value) => {
+    apiFetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [name]: value }),
+    }).catch(() => {
+      // Keep the local control responsive; the next telemetry update will
+      // reflect the server state if the request could not be delivered.
+    });
+  };
 
   // 4. OLED Astro Red Mode Persistence
   const toggleCrimson = () => {
@@ -319,9 +344,17 @@ export default function App() {
         isCrimson={isCrimson}
         onToggleCrimson={toggleCrimson}
         revealDeepSky={revealDeepSky}
-        onToggleRevealDeepSky={() => setRevealDeepSky(!revealDeepSky)}
+        onToggleRevealDeepSky={() => {
+            const next = !revealDeepSky;
+            setRevealDeepSky(next);
+            updateProcessingSetting('revealDeepSky', next);
+          }}
         clearCityGlow={clearCityGlow}
-        onToggleClearCityGlow={() => setClearCityGlow(!clearCityGlow)}
+        onToggleClearCityGlow={() => {
+            const next = !clearCityGlow;
+            setClearCityGlow(next);
+            updateProcessingSetting('clearCityGlow', next);
+          }}
       />
 
       {/* Session Settings Sheet */}
