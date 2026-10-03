@@ -39,7 +39,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: "pip"
 
       - name: Install Python Dependencies
@@ -67,7 +67,7 @@ jobs:
           - os: ubuntu-latest
             artifact_name: AstroLink
             release_asset: AstroLink-linux-x64
-          - os: macos-latest
+          - os: macos-13
             artifact_name: AstroLink
             release_asset: AstroLink-macos-x64
 
@@ -89,7 +89,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
 
       - name: Install Build Dependencies
         run: |
