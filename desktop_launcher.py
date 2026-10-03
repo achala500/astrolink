@@ -22,13 +22,13 @@ logging.basicConfig(
 logger = logging.getLogger("astrolink.launcher")
 
 
-def wait_for_server_and_open_browser(url: str = "http://localhost:8080", timeout: float = 12.0) -> None:
-    """Polls local socket until server accepts connections, then launches browser."""
+def wait_for_server_and_open_browser(url: str, port: int, timeout: float = 12.0) -> None:
+    """Polls the configured local port until the server is ready."""
     start_time = time.time()
     logger.info("Awaiting AstroLink server initialization...")
     while time.time() - start_time < timeout:
         try:
-            with socket.create_connection(("127.0.0.1", 8080), timeout=0.4):
+            with socket.create_connection(("127.0.0.1", port), timeout=0.4):
                 time.sleep(0.4)
                 logger.info("Server verified active. Opening %s in default browser...", url)
                 webbrowser.open(url)
@@ -56,17 +56,26 @@ def main() -> None:
     import uvicorn
     from backend.app.main import app
 
+    # Permit a non-default port when 8080 is already occupied.
+    try:
+        port = int(os.environ.get("ASTROLINK_PORT", "8080"))
+    except ValueError:
+        port = 8080
+    if not 1 <= port <= 65535:
+        port = 8080
+    local_url = f"http://localhost:{port}"
+
     # Spawn browser launcher in daemon thread
     browser_thread = threading.Thread(
         target=wait_for_server_and_open_browser,
-        kwargs={"url": "http://localhost:8080", "timeout": 12.0},
+        kwargs={"url": local_url, "port": port, "timeout": 12.0},
         daemon=True,
     )
     browser_thread.start()
 
     # Run Uvicorn server on all interfaces (enabling local + hotspot connections)
-    logger.info("Launching AstroLink server on 0.0.0.0:8080 (mDNS: astrolink.local:8080)...")
-    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
+    logger.info("Launching AstroLink server on 0.0.0.0:%d", port)
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
 
 
 if __name__ == "__main__":

@@ -145,7 +145,9 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # UPX compression often increases antivirus false positives. Keep the
+    # executable uncompressed for reproducible, Defender-friendly builds.
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,  # Set to True for field diagnostics/logs; can be toggled to False for windowless

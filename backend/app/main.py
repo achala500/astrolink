@@ -479,7 +479,7 @@ async def lifespan(app: FastAPI):
                 type_="_http._tcp.local.",
                 name="astrolink._http._tcp.local.",
                 addresses=[socket.inet_aton(local_ip)],
-                port=8080,
+                port=int(os.environ.get("ASTROLINK_PORT", os.environ.get("PORT", "8080"))),
                 server="astrolink.local.",
                 properties={"path": "/"},
             )
