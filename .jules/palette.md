@@ -1,0 +1,3 @@
+## 2025-05-18 - Interactive Status Capsules & Responsive Icon Buttons Accessibility
+**Learning:** In dark mode / astro UI layouts, compact custom status capsules (like Dynamic Island) and responsive icon buttons (where text labels hide on mobile viewports) frequently lack keyboard accessibility and screen reader labels. Custom `<div>` click handlers must always include `role="button"`, `tabIndex={0}`, `aria-expanded`, and `onKeyDown` (Enter/Space) handlers. Responsive buttons must retain explicit `aria-label` attributes even when text labels are hidden via CSS (`hidden md:inline`).
+**Action:** Always pair `onClick` on non-button containers with full ARIA role and keyboard handlers, and assign `aria-label` to buttons with responsive text visibility.
