@@ -101,31 +101,11 @@ class CameraIntervalometer:
                 logger.debug("No gphoto2 DSLR camera detected: %s", e)
                 self.camera = None
 
-        # 3. Try OpenCV USB / Astronomy / System Camera Device 0
-        try:
-            import cv2
-            cap = cv2.VideoCapture(0)
-            if cap.isOpened():
-                ret, frame = cap.read()
-                if ret and frame is not None:
-                    self._cv2_cap = cap
-                    self.camera_mode = "opencv"
-                    self._is_connected = True
-                    self.last_error = None
-                    logger.info(
-                        "Hardware camera connected via OpenCV (Device 0, %dx%d px).",
-                        frame.shape[1], frame.shape[0]
-                    )
-                    return True
-                else:
-                    cap.release()
-        except Exception as e:
-            logger.debug("OpenCV camera probe failed: %s", e)
-
-        # 4. Fallback to simulation only if NO physical camera is available
-        self.camera_mode = "simulate"
+        # 3. Dedicated Astronomy Camera / Hot Folder Mode (N.I.N.A, ASIAIR, SharpCap, ZWO/QHY)
+        # In field operations, astro cameras write directly to incoming directory
+        self.camera_mode = "folder_watch"
         self._is_connected = True
-        logger.warning("No physical camera detected. Operating in simulation fallback mode.")
+        logger.info("Camera station armed in Astro Hot-Folder & Direct File Ingestion mode.")
         return True
 
     def disconnect(self) -> None:
@@ -138,13 +118,6 @@ class CameraIntervalometer:
             except Exception as e:
                 logger.debug("Error while closing camera session: %s", e)
             self.camera = None
-
-        if self._cv2_cap is not None:
-            try:
-                self._cv2_cap.release()
-            except Exception as e:
-                logger.debug("Error closing OpenCV camera: %s", e)
-            self._cv2_cap = None
 
         self._is_connected = False
         logger.info("Camera disconnected.")
@@ -173,25 +146,10 @@ class CameraIntervalometer:
         """Executes a single hardware exposure and fetches data into memory."""
         import cv2
 
-        # 1. OpenCV USB / System Camera Hardware Capture
-        if self.camera_mode == "opencv" and self._cv2_cap is not None:
-            ret, frame = self._cv2_cap.read()
-            if not ret or frame is None:
-                # Attempt to reopen camera Device 0
-                self._cv2_cap.open(0)
-                ret, frame = self._cv2_cap.read()
-
-            if ret and frame is not None:
-                ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-                if ok:
-                    return buf.tobytes()
-
-            # If read failed, generate fallback simulated shot
-            return self._capture_simulated_shot(self.current_frame, exposure_seconds)
-
-        # 2. DSLR / Mirrorless Capture via libgphoto2
-        if iso is not None:
-            self._set_camera_config("iso", iso)
+        # 1. DSLR / Mirrorless Capture via libgphoto2 (when camera is present)
+        if self.camera_mode == "gphoto2" and self.camera:
+            if iso is not None:
+                self._set_camera_config("iso", iso)
 
         if bulb_mode or exposure_seconds > 30.0:
             # Bulb mode exposure
@@ -223,6 +181,9 @@ class CameraIntervalometer:
                 file_path.folder, file_path.name, self._gp.GP_FILE_TYPE_NORMAL
             )
             return camera_file.get_data_and_size()
+
+        # Fallback if no physical DSLR attached
+        return self._capture_simulated_shot(self.current_frame, exposure_seconds)
 
     def _capture_simulated_shot(
         self,

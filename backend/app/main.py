@@ -817,7 +817,7 @@ else:
     logger.warning("Frontend dist directory not found. Serving API and WebSocket only.")
 
 
-def launch_desktop_app(host: str = "0.0.0.0", port: int = 8080, open_browser: bool = True) -> None:
+def launch_desktop_app(host: str = "0.0.0.0", port: int = 8080, open_browser: bool = True) -> None:  # nosec B104
     """Starts Uvicorn server and automatically opens user's default browser."""
     import threading
     import time

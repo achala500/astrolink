@@ -1,0 +1,81 @@
+name: Jules Cybersecurity & Vulnerability Audit CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * *'  # Daily security scan at 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  security-events: write
+
+jobs:
+  python-security-scan:
+    name: Python AST & Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Security Scanners
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt bandit pip-audit
+
+      - name: Run Bandit Cybersecurity Scanner (High & Medium Severity)
+        run: |
+          bandit -r backend/app -ll -ii -f screen
+
+      - name: Run Dependency CVE / Exploit Vulnerability Audit
+        run: |
+          pip-audit --desc on
+
+  frontend-security-audit:
+    name: Frontend Supply Chain & Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci --ignore-scripts || npm install
+
+      - name: Run npm Audit
+        working-directory: ./frontend
+        run: |
+          npm audit --audit-level=critical
+
+  jules-security-issue-on-failure:
+    name: Report Security Vulnerabilities to Jules
+    needs: [python-security-scan, frontend-security-audit]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Actionable Security Issue for Jules
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[JULES SECURITY ALERT] Automated Vulnerability / CVE Flagged on ${context.sha.substring(0,7)}`,
+              body: `## Cybersecurity Vulnerability Alert\n\nSecurity scanning (Bandit, pip-audit, or npm audit) detected potential security flaws or vulnerable dependencies.\n\n### Instructions for Jules\n1. Review the workflow failure logs to isolate the exact CVE or AST finding.\n2. Upgrade vulnerable dependencies or patch sanitization routines.\n3. Verify all 25+ test suites pass with zero regressions.\n4. Submit a security fix PR.`,
+              labels: ['security', 'vulnerability', 'priority: high', 'jules', 'auto-triage'],
+            });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { User } from 'lucide-react';
 import DynamicIsland from './components/DynamicIsland';
 import TelemetryHUD from './components/TelemetryHUD';
 import Viewport from './components/Viewport';
@@ -6,6 +7,7 @@ import Dock from './components/Dock';
 import SessionSheet from './components/SessionSheet';
 import ExportSheet from './components/ExportSheet';
 import FeedbackSheet from './components/FeedbackSheet';
+import AuthModal from './components/AuthModal';
 import { soundEngine } from './utils/audio';
 
 export default function App() {
@@ -27,9 +29,10 @@ export default function App() {
   const [bulbMode, setBulbMode] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
 
-  // Sheets Visibility
+  // Sheets & Modals Visibility
   const [sessionSheetOpen, setSessionSheetOpen] = useState(false);
   const [exportSheetOpen, setExportSheetOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Telemetry & WebSocket State
   const [isConnected, setIsConnected] = useState(false);
@@ -235,9 +238,27 @@ export default function App() {
   };
 
   return (
-    <div className={`relative w-screen h-screen overflow-hidden select-none ${
+    <div className={`fixed inset-0 w-full h-[100dvh] overflow-hidden select-none ${
       isCrimson ? 'theme-crimson bg-black text-red-500' : 'bg-black text-slate-100'
     }`}>
+      {/* Cloud Auth / User Profile Button (Top-Left) */}
+      <button
+        type="button"
+        onClick={() => {
+          soundEngine.playClick();
+          setAuthModalOpen(true);
+        }}
+        className={`fixed top-4 left-4 z-40 h-10 px-3.5 rounded-full flex items-center gap-2 border shadow-xl backdrop-blur-xl transition-all duration-200 active:scale-90 ${
+          isCrimson
+            ? 'bg-black/90 border-red-900/50 text-red-400 hover:border-red-600'
+            : 'bg-slate-950/80 border-white/10 text-slate-200 hover:border-white/30'
+        }`}
+        title="Astronomer Profile & Firebase Cloud Sync"
+      >
+        <User className="w-3.5 h-3.5 text-emerald-400" />
+        <span className="text-xs font-semibold uppercase tracking-wider hidden sm:inline">Profile</span>
+      </button>
+
       {/* Dynamic Island Status Capsule & Atmospheric Alert HUD */}
       <DynamicIsland
         telemetry={telemetry}
@@ -312,6 +333,13 @@ export default function App() {
       <FeedbackSheet
         isCrimson={isCrimson}
         backendUrl={httpUrl}
+      />
+
+      {/* Firebase Cloud Authentication Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        isCrimson={isCrimson}
       />
     </div>
   );
