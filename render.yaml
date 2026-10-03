@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: astrolink-field-station
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    autoDeploy: true

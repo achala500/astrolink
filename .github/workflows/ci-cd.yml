@@ -1,0 +1,141 @@
+name: AstroLink CI/CD & Multi-Platform Executable Build
+
+on:
+  push:
+    branches: [ "master", "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================================================
+  # 1. Quality Assurance & Automated Testing
+  # ============================================================================
+  test:
+    name: Test Frontend & Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies & Build
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Pytest Test Suite
+        run: |
+          python -m pytest backend/test_pipeline.py backend/test_server.py backend/test_licensing.py -v
+
+  # ============================================================================
+  # 2. Build Single-Executable Desktop Applications (Windows & Linux)
+  # ============================================================================
+  build-executables:
+    needs: test
+    name: Build Desktop Binary on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: AstroLink.exe
+            release_asset: AstroLink-windows-x64.exe
+          - os: ubuntu-latest
+            artifact_name: AstroLink
+            release_asset: AstroLink-linux-x64
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build Production Frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Build Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Compile Single Executable with PyInstaller
+        run: |
+          pyinstaller --clean astrolink.spec
+
+      - name: Rename Release Asset
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp dist/AstroLink.exe dist/${{ matrix.release_asset }}
+          else
+            chmod +x dist/AstroLink
+            cp dist/AstroLink dist/${{ matrix.release_asset }}
+          fi
+
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.release_asset }}
+          path: dist/${{ matrix.release_asset }}
+
+  # ============================================================================
+  # 3. Automatic GitHub Release on Tag
+  # ============================================================================
+  release:
+    needs: build-executables
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: AstroLink-windows-x64.exe
+
+      - name: Download Linux Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: AstroLink-linux-x64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            AstroLink-windows-x64.exe
+            AstroLink-linux-x64
+          draft: false
+          prerelease: false
+          generate_release_notes: true
