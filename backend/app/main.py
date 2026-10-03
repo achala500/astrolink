@@ -51,7 +51,7 @@ from backend.app.pipeline.gates import (
     compute_fwhm,
 )
 from backend.app.pipeline.gradient import remove_background_gradient
-from backend.app.pipeline.ingest import load_universal_frame
+from backend.app.pipeline.ingest import _normalize_array_to_float32, load_universal_frame
 from backend.app.pipeline.satellites import detect_satellite_streaks
 from backend.app.pipeline.stacker import WelfordStacker
 from backend.app.pipeline.stretch import auto_stretch
@@ -59,6 +59,7 @@ from backend.app.pipeline.stretch import auto_stretch
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("astrolink.server")
+MAX_UPLOAD_BYTES = 128 * 1024 * 1024  # protect the field station from accidental huge uploads
 
 
 # =====================================================================
@@ -165,11 +166,14 @@ class AstrophotographySession:
         # 1. Universal format decoding (FITS, RAW, Linear DNG, TIFF, JPEG, PNG, WebP)
         # Guarantees standard 3-channel (H, W, 3) float32 in range [0.0, 1.0]
         if isinstance(image_bytes, np.ndarray):
-            frame = image_bytes.astype(np.float32)
-            if frame.max() > 1.0:
-                frame /= 255.0
+            if image_bytes.ndim not in (2, 3):
+                raise ValueError(f"Expected a 2D or 3D frame, got shape {image_bytes.shape}")
+            frame = _normalize_array_to_float32(image_bytes)
         else:
             frame = load_universal_frame(image_bytes)
+
+        if frame.size == 0 or not np.isfinite(frame).all():
+            raise ValueError("Frame contains no usable finite pixel data")
 
         # Single-channel 2D grayscale for star gates, streak detection, and registration
         if frame.ndim == 3:
@@ -380,11 +384,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS setup allowing all origins
+# API calls are same-origin in production and proxied in development.  Keep
+# credentials disabled with a wildcard origin; browsers reject the combination
+# of allow_credentials=True and Access-Control-Allow-Origin: *.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -436,9 +442,16 @@ async def upload_frame(file: UploadFile = File(...)):
     Broadcasts real-time telemetry and 1080p WebP previews across WebSocket clients.
     """
     try:
-        data = await file.read()
-        filename = file.filename or "sub_exposure.jpg"
+        data = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Frame exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MiB upload limit",
+            )
+        if not data:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded frame is empty")
 
+        filename = file.filename or "sub_exposure.jpg"
         result = session.process_sub_exposure(data, filename=filename)
 
         if not result.get("accepted"):
@@ -470,12 +483,17 @@ async def upload_frame(file: UploadFile = File(...)):
             "preview": preview,
         }
 
+    except HTTPException:
+        raise
+    except (ValueError, ImportError) as e:
+        logger.warning("Rejected frame upload: %s", e)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e)) from e
     except Exception as e:
         logger.error("Failed to ingest frame: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Frame ingestion failed: {str(e)}",
-        )
+            detail="Frame ingestion failed unexpectedly",
+        ) from e
 
 
 @app.get("/api/export")
@@ -550,9 +568,16 @@ async def websocket_telemetry(websocket: WebSocket):
 
             # Handle WebSocket Commands
             if command == "START_SEQUENCE":
-                exposure_seconds = float(cmd_data.get("exposure_seconds", 30.0))
-                frame_count = int(cmd_data.get("frame_count", 10))
-                delay_seconds = float(cmd_data.get("delay_seconds", 2.0))
+                try:
+                    exposure_seconds = float(cmd_data.get("exposure_seconds", 30.0))
+                    frame_count = int(cmd_data.get("frame_count", 10))
+                    delay_seconds = float(cmd_data.get("delay_seconds", 2.0))
+                except (TypeError, ValueError):
+                    await websocket.send_json({"type": "command_response", "command": "START_SEQUENCE", "success": False, "error": "Exposure, frame count, and delay must be numeric"})
+                    continue
+                if not (0.1 <= exposure_seconds <= 86400 and 1 <= frame_count <= 10000 and 0 <= delay_seconds <= 86400):
+                    await websocket.send_json({"type": "command_response", "command": "START_SEQUENCE", "success": False, "error": "Sequence values are outside supported limits"})
+                    continue
                 iso = cmd_data.get("iso", None)
                 bulb_mode = bool(cmd_data.get("bulb_mode", False))
 

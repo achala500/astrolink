@@ -31,10 +31,16 @@ def _normalize_array_to_float32(arr: np.ndarray) -> np.ndarray:
         max_val = float(np.max(arr)) if np.max(arr) > 0 else 1.0
         return np.clip(arr.astype(np.float32) / max_val, 0.0, 1.0)
 
-    # Floating point inputs
-    f32 = arr.astype(np.float32)
-    max_val = float(np.max(f32))
-    min_val = float(np.min(f32))
+    # Floating point inputs. Camera files can contain NaN/Inf pixels; sanitize
+    # them before statistics so one bad pixel cannot poison an entire frame.
+    f32 = np.asarray(arr, dtype=np.float32)
+    finite = np.isfinite(f32)
+    if not np.any(finite):
+        return np.zeros(f32.shape, dtype=np.float32)
+    finite_values = f32[finite]
+    max_val = float(np.max(finite_values))
+    min_val = float(np.min(finite_values))
+    f32 = np.nan_to_num(f32, nan=min_val, posinf=max_val, neginf=min_val)
 
     if max_val > 255.0:
         return np.clip(f32 / 65535.0, 0.0, 1.0)

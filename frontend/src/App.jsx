@@ -54,20 +54,20 @@ export default function App() {
   const prevStackCountRef = useRef(0);
   const wakeLockRef = useRef(null);
 
-  // Determine backend HTTP and WS URLs
+  // Use same-origin URLs so the app works behind HTTPS/reverse proxies and Arena previews.
+  // Vite proxies these paths to the local API during development.
   const getBackendUrls = () => {
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const host = isLocalhost ? '127.0.0.1:8080' : `${window.location.hostname}:8080`;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return {
-      wsUrl: `ws://${host}/ws`,
-      httpUrl: `http://${host}`,
+      wsUrl: `${protocol}//${window.location.host}/ws`,
+      httpUrl: '',
     };
   };
 
   const { wsUrl, httpUrl } = getBackendUrls();
 
   // 1. WebSocket Auto-Reconnect with Exponential Backoff
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback(function connect() {
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -134,13 +134,13 @@ export default function App() {
         const backoff = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 8000);
         reconnectAttemptRef.current += 1;
         reconnectTimeoutRef.current = setTimeout(() => {
-          connectWebSocket();
+          connect();
         }, backoff);
       };
     } catch {
       setIsConnected(false);
       reconnectTimeoutRef.current = setTimeout(() => {
-        connectWebSocket();
+        connect();
       }, 3000);
     }
   }, [wsUrl]);
