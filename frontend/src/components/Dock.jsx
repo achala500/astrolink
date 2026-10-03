@@ -7,7 +7,6 @@ import {
   SunMedium, 
   Download, 
   RotateCcw, 
-  Eye, 
   Moon,
   Flame
 } from 'lucide-react';

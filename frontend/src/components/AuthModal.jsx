@@ -2,14 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, 
   X, 
-  LogIn, 
   LogOut, 
   Mail, 
   Lock, 
-  Sparkles, 
-  ShieldCheck, 
-  Cloud,
-  CheckCircle2
+  Cloud
 } from 'lucide-react';
 import { 
   auth, 
@@ -54,6 +50,7 @@ export default function AuthModal({ isOpen, onClose, isCrimson }) {
         await signInAnonymously(auth);
         onClose();
       } catch (guestErr) {
+        console.warn("Guest sign-in fallback failed:", guestErr);
         setError("Sign-in unavailable offline. Switched to Field Guest session.");
       }
     } finally {
@@ -89,6 +86,7 @@ export default function AuthModal({ isOpen, onClose, isCrimson }) {
       await signInAnonymously(auth);
       onClose();
     } catch (err) {
+      console.warn("Anonymous sign-in error:", err);
       setError('Could not start field guest session.');
     } finally {
       setLoading(false);

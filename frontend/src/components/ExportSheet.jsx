@@ -11,8 +11,7 @@ import {
   Check, 
   FileText,
   Image,
-  Loader2,
-  ShieldCheck
+  Loader2
 } from 'lucide-react';
 import { soundEngine } from '../utils/audio';
 
@@ -25,11 +24,11 @@ export default function ExportSheet({
   backendUrl,
   previewUrl
 }) {
-  if (!isOpen) return null;
-
   const [downloadingTiff, setDownloadingTiff] = useState(false);
   const [downloadedTiff, setDownloadedTiff] = useState(false);
   const [downloadingPreview, setDownloadingPreview] = useState(false);
+
+  if (!isOpen) return null;
 
   const stackCount = telemetry?.stackCount ?? 0;
   const totalExp = telemetry?.totalExp ?? 0;
@@ -239,32 +238,32 @@ export default function ExportSheet({
             <button
               type="button"
               onClick={() => handleSharePreview('jpeg')}
-              disabled={!previewUrl}
+              disabled={!previewUrl || downloadingPreview}
               className={`h-12 px-4 rounded-2xl flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all active:scale-98 border ${
-                !previewUrl
+                !previewUrl || downloadingPreview
                   ? 'opacity-40 cursor-not-allowed border-transparent bg-slate-900 text-slate-600'
                   : isCrimson
                     ? 'border-red-900/50 bg-red-950/20 hover:bg-red-900/40 text-red-300'
                     : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
               }`}
             >
-              <Image className="w-4 h-4" />
+              {downloadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
               <span>Share JPEG</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSharePreview('webp')}
-              disabled={!previewUrl}
+              disabled={!previewUrl || downloadingPreview}
               className={`h-12 px-4 rounded-2xl flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all active:scale-98 border ${
-                !previewUrl
+                !previewUrl || downloadingPreview
                   ? 'opacity-40 cursor-not-allowed border-transparent bg-slate-900 text-slate-600'
                   : isCrimson
                     ? 'border-red-900/50 bg-red-950/20 hover:bg-red-900/40 text-red-300'
                     : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
               }`}
             >
-              <Share2 className="w-4 h-4" />
+              {downloadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
               <span>Share WebP</span>
             </button>
           </div>

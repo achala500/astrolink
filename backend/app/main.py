@@ -540,9 +540,11 @@ async def websocket_telemetry(websocket: WebSocket):
 
             try:
                 cmd_data = json.loads(text)
-                command = cmd_data.get("command") or cmd_data.get("action") or command
-            except Exception:
-                pass
+                if isinstance(cmd_data, dict):
+                    command = cmd_data.get("command") or cmd_data.get("action") or command
+            except (json.JSONDecodeError, AttributeError):
+                # Plain text command payload or invalid JSON
+                pass  # nosec B110
 
             # Handle WebSocket Commands
             if command == "START_SEQUENCE":

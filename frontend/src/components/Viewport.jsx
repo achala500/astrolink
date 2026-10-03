@@ -8,7 +8,6 @@ import {
   UploadCloud, 
   Camera, 
   Video, 
-  VideoOff, 
   CheckCircle2, 
   Loader2 
 } from 'lucide-react';
@@ -49,7 +48,6 @@ export default function Viewport({
 
   // In-Browser Live Device / Phone Camera State
   const [isDeviceCamActive, setIsDeviceCamActive] = useState(false);
-  const [isCapturingLive, setIsCapturingLive] = useState(false);
 
   const fwhm = telemetry?.fwhm ?? 0;
   const isSharp = fwhm > 0 && fwhm <= 2.5;
@@ -69,69 +67,8 @@ export default function Viewport({
     setTransform({ scale, x, y });
   }, []);
 
-  // Main canvas render function
-  const renderCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-
-    // Clear background
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, width, height);
-
-    const img = imageRef.current;
-    if (!img) {
-      // Cosmic placeholder when waiting for first exposure
-      renderStarFieldPlaceholder(ctx, width, height, isCrimson);
-      return;
-    }
-
-    ctx.save();
-    // Apply pan & zoom transform
-    ctx.translate(transform.x, transform.y);
-    ctx.scale(transform.scale, transform.scale);
-
-    // Render astronomical preview with high quality smoothing
-    ctx.imageSmoothingEnabled = transform.scale < 2.0;
-    ctx.drawImage(img, 0, 0, img.width, img.height);
-
-    // If star reticle is targeted, render Apple-style targeting brackets on image
-    if (targetPoint) {
-      renderReticle(ctx, targetPoint.imgX, targetPoint.imgY, isCrimson);
-    }
-
-    ctx.restore();
-
-    // Render Loupe if active
-    if (targetPoint && showLoupe && img) {
-      renderLoupe(img, targetPoint.imgX, targetPoint.imgY);
-    }
-  }, [transform, targetPoint, showLoupe, isCrimson]);
-
-  // Load preview image when previewUrl updates
-  useEffect(() => {
-    if (!previewUrl) return;
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      imageRef.current = img;
-      if (!hasInitiallyFittedRef.current) {
-        hasInitiallyFittedRef.current = true;
-        fitToScreen(img);
-      } else {
-        renderCanvas();
-      }
-    };
-    img.src = previewUrl;
-  }, [previewUrl, fitToScreen, renderCanvas]);
-
   // Cosmic empty state
-  const renderStarFieldPlaceholder = (ctx, w, h, crimson) => {
+  const renderStarFieldPlaceholder = useCallback((ctx, w, h, crimson) => {
     ctx.fillStyle = crimson ? '#0a0000' : '#030712';
     ctx.fillRect(0, 0, w, h);
 
@@ -164,10 +101,10 @@ export default function Viewport({
     ctx.moveTo(w / 2, h / 2 - 60);
     ctx.lineTo(w / 2, h / 2 + 60);
     ctx.stroke();
-  };
+  }, []);
 
   // Render Apple targeting brackets around star
-  const renderReticle = (ctx, x, y, crimson) => {
+  const renderReticle = useCallback((ctx, x, y, crimson) => {
     const size = 24;
     const arm = 8;
     ctx.strokeStyle = crimson ? '#ef4444' : '#10b981';
@@ -210,10 +147,10 @@ export default function Viewport({
     ctx.fill();
 
     ctx.shadowBlur = 0;
-  };
+  }, []);
 
   // Render 6x Magnification Loupe Inset
-  const renderLoupe = (img, x, y) => {
+  const renderLoupe = useCallback((img, x, y) => {
     const loupe = loupeCanvasRef.current;
     if (!loupe) return;
     const lCtx = loupe.getContext('2d');
@@ -235,7 +172,68 @@ export default function Viewport({
     lCtx.moveTo(0, loupe.height / 2);
     lCtx.lineTo(loupe.width, loupe.height / 2);
     lCtx.stroke();
-  };
+  }, [isCrimson]);
+
+  // Main canvas render function
+  const renderCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, width, height);
+
+    const img = imageRef.current;
+    if (!img) {
+      // Cosmic placeholder when waiting for first exposure
+      renderStarFieldPlaceholder(ctx, width, height, isCrimson);
+      return;
+    }
+
+    ctx.save();
+    // Apply pan & zoom transform
+    ctx.translate(transform.x, transform.y);
+    ctx.scale(transform.scale, transform.scale);
+
+    // Render astronomical preview with high quality smoothing
+    ctx.imageSmoothingEnabled = transform.scale < 2.0;
+    ctx.drawImage(img, 0, 0, img.width, img.height);
+
+    // If star reticle is targeted, render Apple-style targeting brackets on image
+    if (targetPoint) {
+      renderReticle(ctx, targetPoint.imgX, targetPoint.imgY, isCrimson);
+    }
+
+    ctx.restore();
+
+    // Render Loupe if active
+    if (targetPoint && showLoupe && img) {
+      renderLoupe(img, targetPoint.imgX, targetPoint.imgY);
+    }
+  }, [transform, targetPoint, showLoupe, isCrimson, renderStarFieldPlaceholder, renderReticle, renderLoupe]);
+
+  // Load preview image when previewUrl updates
+  useEffect(() => {
+    if (!previewUrl) return;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      imageRef.current = img;
+      if (!hasInitiallyFittedRef.current) {
+        hasInitiallyFittedRef.current = true;
+        fitToScreen(img);
+      } else {
+        renderCanvas();
+      }
+    };
+    img.src = previewUrl;
+  }, [previewUrl, fitToScreen, renderCanvas]);
 
   // Resize canvas to fill container
   useEffect(() => {
@@ -481,7 +479,6 @@ export default function Viewport({
         streamRef.current = null;
       }
       setIsDeviceCamActive(false);
-      setIsCapturingLive(false);
       soundEngine.playClick();
       return;
     }
@@ -504,7 +501,6 @@ export default function Viewport({
       setIsDeviceCamActive(true);
 
       // Start capture loop: grabs frame every 3s and sends to /api/upload
-      setIsCapturingLive(true);
       captureIntervalRef.current = setInterval(() => {
         captureAndUploadVideoFrame();
       }, 3000);

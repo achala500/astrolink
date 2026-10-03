@@ -3,12 +3,10 @@ import {
   Sparkles, 
   SunMedium, 
   Download, 
-  FileText, 
   Check, 
   Loader2, 
   Layers, 
-  RotateCcw,
-  SlidersHorizontal
+  RotateCcw
 } from 'lucide-react';
 import { soundEngine } from '../utils/audio';
 

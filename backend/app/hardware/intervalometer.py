@@ -157,16 +157,16 @@ class CameraIntervalometer:
             try:
                 # Canon EOS bulb trigger
                 self._set_camera_config("eosbulb", 1)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Bulb start config skipped/unsupported on this model: %s", e)
 
             # Wait precisely for exposure duration
             time.sleep(exposure_seconds)
 
             try:
                 self._set_camera_config("eosbulb", 0)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Bulb stop config skipped/unsupported on this model: %s", e)
 
             # Fetch the resulting image from the camera
             camera_file = self.camera.file_get(

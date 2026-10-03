@@ -11,7 +11,7 @@ import logging
 import os
 import queue
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 import threading
@@ -126,7 +126,7 @@ fi
             ]
             logger.info("Spawning gphoto2 process: %s (cwd=%s)", " ".join(cmd), self.watch_dir)
             try:
-                self._process = subprocess.Popen(
+                self._process = subprocess.Popen(  # nosec B603
                     cmd,
                     cwd=str(self.watch_dir),
                     stdout=subprocess.PIPE,

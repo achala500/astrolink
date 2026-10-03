@@ -27,12 +27,6 @@
   },
   "overrides": {
     "braces": "3.0.3",
-    "@grpc/grpc-js": ">=1.14.0",
-    "chokidar": {
-      "braces": "3.0.3"
-    },
-    "micromatch": {
-      "braces": "3.0.3"
-    }
+    "@grpc/grpc-js": ">=1.14.0"
   }
 }

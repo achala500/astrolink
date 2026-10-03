@@ -8,6 +8,7 @@ limited to a maximum of 10 frames per session.
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 import logging
 import os
@@ -72,7 +73,7 @@ def _decode_signature(sig_str: str) -> bytes:
         raw_b64 = base64.b64decode(sig_str)
         if len(raw_b64) == 64:
             return raw_b64
-    except Exception:
+    except (ValueError, binascii.Error):
         pass
 
     # Try hex decoding
@@ -80,7 +81,7 @@ def _decode_signature(sig_str: str) -> bytes:
         raw_hex = bytes.fromhex(sig_str)
         if len(raw_hex) == 64:
             return raw_hex
-    except Exception:
+    except ValueError:
         pass
 
     # Fallback to standard base64 with padding fix
@@ -327,10 +328,7 @@ class LicenseManager:
     def deactivate(self) -> None:
         """Resets instance to community trial mode."""
         if self._key_path.is_file():
-            try:
-                self._key_path.unlink()
-            except Exception:
-                pass
+            self._key_path.unlink(missing_ok=True)
         self._current_status = LicenseStatus(
             is_valid=False,
             licensee="Unregistered Field User",

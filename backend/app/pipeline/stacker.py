@@ -87,9 +87,8 @@ class WelfordStacker:
         if self.mean is None or self.counts is None or self.m2 is None:
             self._init_buffers(x.shape)
 
-        assert self.mean is not None
-        assert self.counts is not None
-        assert self.m2 is not None
+        if self.mean is None or self.counts is None or self.m2 is None:
+            raise RuntimeError("Stacker internal state buffers were not initialized correctly.")
 
         # Mask of pixels to include
         if mask is not None:

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User } from 'lucide-react';
 import DynamicIsland from './components/DynamicIsland';
-import TelemetryHUD from './components/TelemetryHUD';
 import Viewport from './components/Viewport';
 import Dock from './components/Dock';
 import SessionSheet from './components/SessionSheet';
@@ -98,7 +97,7 @@ export default function App() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'telemetry') {
-            setTelemetry(prev => {
+            setTelemetry(() => {
               // Trigger harmonious chime if new frame was added
               if (data.stackCount > prevStackCountRef.current && data.stackCount > 0) {
                 soundEngine.playFrameCaptured();
@@ -132,11 +131,15 @@ export default function App() {
         // Exponential backoff reconnect: 1s, 2s, 4s, 8s max
         const backoff = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 8000);
         reconnectAttemptRef.current += 1;
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, backoff);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectWebSocket();
+        }, backoff);
       };
     } catch {
       setIsConnected(false);
-      reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        connectWebSocket();
+      }, 3000);
     }
   }, [wsUrl]);
 
