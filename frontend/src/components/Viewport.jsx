@@ -605,15 +605,15 @@ export default function Viewport({
           <div className="max-w-sm rounded-2xl border border-white/10 bg-slate-950/75 px-5 py-4 text-center shadow-2xl backdrop-blur-md">
             <div className="text-sm font-semibold text-slate-100">
               {!isConnected ? 'Connecting to AstroLink station…' :
+                !telemetry?.cameraConnected ? 'Camera not connected' :
                 telemetry?.cameraMode === 'folder_watch' ? 'Hot-folder ingestion ready' :
-                telemetry?.cameraMode === 'gphoto2' ? 'Waiting for first exposure' :
                 'Waiting for first exposure'}
             </div>
             <div className="mt-1 text-[11px] leading-relaxed text-slate-400">
               {!isConnected ? 'The local control link is offline.' :
+                !telemetry?.cameraConnected ? 'Connect a shutter-capable camera over USB, or upload a sub-exposure to begin the preview.' :
                 telemetry?.cameraMode === 'folder_watch' ? 'Drop or copy completed camera files into the watched folder. Hot-folder mode cannot trigger the shutter.' :
-                telemetry?.cameraMode === 'gphoto2' ? 'Your shutter-capable camera is connected. Start a sequence or upload a sub-exposure.' :
-                'Connect a shutter-capable camera over USB, or upload a sub-exposure to begin the preview.'}
+                'Your shutter-capable camera is connected. Start a sequence or upload a sub-exposure.'}
             </div>
           </div>
         </div>

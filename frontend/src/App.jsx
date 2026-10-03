@@ -104,6 +104,14 @@ export default function App() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'command_response') {
+            if (data.cameraMode) {
+              setTelemetry(prev => ({
+                ...prev,
+                cameraMode: data.cameraMode,
+                cameraConnected: data.cameraConnected,
+                cameraError: data.error || null,
+              }));
+            }
             if (data.command === 'START_SEQUENCE' && !data.success) {
               setIsRunning(false);
               setCommandError(data.error || 'Camera sequence could not start');
