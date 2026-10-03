@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Camera } from 'lucide-react';
+import { User, Camera, DownloadCloud, X } from 'lucide-react';
 import DynamicIsland from './components/DynamicIsland';
 import Viewport from './components/Viewport';
 import Dock from './components/Dock';
@@ -48,6 +48,7 @@ export default function App() {
   });
   const [previewUrl, setPreviewUrl] = useState(null);
   const [gpsCoords, setGpsCoords] = useState(null);
+  const [availableUpdate, setAvailableUpdate] = useState(null);
 
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -165,6 +166,16 @@ export default function App() {
     }
   };
 
+  // Check for a verified release notification. Installation remains user-controlled.
+  useEffect(() => {
+    apiFetch('/api/update/check')
+      .then((response) => response.ok ? response.json() : null)
+      .then((update) => {
+        if (update?.updateAvailable && update.releaseUrl) setAvailableUpdate(update);
+      })
+      .catch(() => {});
+  }, []);
+
   // Sync preview controls with the server so a reload or second client does
   // not silently use different processing settings.
   useEffect(() => {
@@ -272,7 +283,20 @@ export default function App() {
   return (
     <div className={`fixed inset-0 w-full h-[100dvh] overflow-hidden select-none ${
       isCrimson ? 'theme-crimson bg-black text-red-500' : 'bg-black text-slate-100'
-    }`}>
+   }`}>
+      {availableUpdate && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-[min(92vw,30rem)] rounded-2xl border border-emerald-400/40 bg-slate-950/95 px-4 py-3 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-center gap-3">
+            <DownloadCloud className="h-5 w-5 shrink-0 text-emerald-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-white">AstroLink {availableUpdate.latestVersion} is available</p>
+              <p className="text-[10px] text-slate-400">Download the verified release from GitHub. Nothing installs silently.</p>
+              <a className="mt-1 inline-block text-[11px] font-semibold text-emerald-300 underline" href={availableUpdate.releaseUrl} target="_blank" rel="noreferrer">View release</a>
+            </div>
+            <button type="button" aria-label="Dismiss update" onClick={() => setAvailableUpdate(null)} className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+          </div>
+        </div>
+      )}
       {/* Top Bar Actions (Top-Left): Profile & Camera Hub */}
       <div className="fixed top-4 left-4 z-40 flex items-center gap-2">
         <button

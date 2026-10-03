@@ -23,10 +23,13 @@ import json
 import logging
 import math
 import os
+import re
 import shutil
 import socket
 import sys
 import threading
+import urllib.error
+import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -62,6 +65,8 @@ from backend.app.pipeline.stretch import auto_stretch
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("astrolink.server")
+APP_VERSION = "0.1.4"
+UPDATE_REPOSITORY = "achala500/astrolink"
 MAX_UPLOAD_BYTES = 128 * 1024 * 1024  # protect the field station from accidental huge uploads
 
 def _extract_bearer_token(request: Request) -> str:
@@ -802,6 +807,37 @@ async def get_status():
 async def get_processing_settings():
     """Returns the active preview-processing settings."""
     return session.set_processing_options()
+
+
+@app.get("/api/update/check")
+async def check_for_updates():
+    """Checks GitHub Releases without exposing credentials or uploading user data.
+
+    This is a notification check, not a silent binary replacement. Automatic
+    installation is intentionally avoided because unsigned binaries cannot be
+    safely trusted; the UI links to the signed/verified release page instead.
+    """
+    if os.environ.get("ASTROLINK_DISABLE_UPDATE_CHECK", "").lower() in {"1", "true", "yes"}:
+        return {"currentVersion": APP_VERSION, "updateAvailable": False, "disabled": True}
+    url = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/releases/latest"
+    try:
+        request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "AstroLink-Update-Checker"})
+        with urllib.request.urlopen(request, timeout=3.0) as response:
+            release = json.loads(response.read().decode("utf-8"))
+        latest_tag = str(release.get("tag_name", "")).lstrip("v")
+        def version_tuple(value: str) -> tuple[int, ...]:
+            return tuple(int(part) for part in re.findall(r"\d+", value)[:4]) or (0,)
+        assets = [{"name": a.get("name"), "url": a.get("browser_download_url")} for a in release.get("assets", [])]
+        return {
+            "currentVersion": APP_VERSION,
+            "latestVersion": latest_tag,
+            "updateAvailable": version_tuple(latest_tag) > version_tuple(APP_VERSION),
+            "releaseUrl": release.get("html_url"),
+            "assets": assets,
+        }
+    except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        logger.info("Update check unavailable: %s", exc)
+        return {"currentVersion": APP_VERSION, "updateAvailable": False, "available": False}
 
 
 @app.post("/api/settings")
