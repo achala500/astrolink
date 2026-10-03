@@ -94,7 +94,13 @@ jobs:
       - name: Install Build Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          # Keep desktop builds portable: RAW support is optional because rawpy
+          # has no wheel on every OS/Python combination. The server still uses
+          # the complete requirements.txt for full RAW/FITS support.
+          pip install --upgrade pip
+          pip install fastapi uvicorn[standard] websockets numpy opencv-python-headless tifffile zeroconf ifaddr cryptography python-multipart pyinstaller
+          pip install astropy || echo "Astropy unavailable; FITS support will report a clear optional-dependency error"
+          pip install rawpy || echo "rawpy unavailable; RAW support will report a clear optional-dependency error"
 
       - name: Compile Single Executable with PyInstaller
         run: |
