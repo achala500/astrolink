@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
+import threading
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -50,6 +53,7 @@ class FeedbackManager:
     def __init__(self, feedback_file: Path = FEEDBACK_FILE):
         self.feedback_file = feedback_file
         self.attachments_dir = feedback_file.parent / "attachments"
+        self._lock = threading.RLock()
         self._ensure_storage()
 
     def _ensure_storage(self):
@@ -65,7 +69,18 @@ class FeedbackManager:
             return []
 
     def _write_all(self, entries: List[dict]):
-        self.feedback_file.write_text(json.dumps(entries, indent=2), encoding="utf-8")
+        """Atomically persist feedback so a crash cannot truncate the JSON store."""
+        payload = json.dumps(entries, indent=2, ensure_ascii=False)
+        self.feedback_file.parent.mkdir(parents=True, exist_ok=True)
+        fd, temp_name = tempfile.mkstemp(prefix="feedback-", suffix=".json", dir=self.feedback_file.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_name, self.feedback_file)
+        finally:
+            Path(temp_name).unlink(missing_ok=True)
 
     def submit(
         self,
@@ -77,24 +92,43 @@ class FeedbackManager:
         attachments: Optional[List[str]] = None,
     ) -> FeedbackEntry:
         """Submits a new feedback item with optional screenshot attachments."""
+        category = str(category or "general").strip().lower()[:32]
+        severity = str(severity or "medium").strip().lower()[:16]
+        if severity not in {"low", "medium", "high", "critical"}:
+            severity = "medium"
+        message = str(message or "").strip()
+        if not message:
+            raise ValueError("Feedback message cannot be empty")
+        if len(message) > 20_000:
+            raise ValueError("Feedback message exceeds the 20,000 character limit")
+
         entry = FeedbackEntry(
             category=category,
             message=message,
             severity=severity,
-            device_info=device_info,
-            telemetry_snapshot=telemetry_snapshot,
+            device_info=str(device_info)[:1_000] if device_info is not None else None,
+            telemetry_snapshot=telemetry_snapshot if isinstance(telemetry_snapshot, dict) else {},
             status="pending",
         )
 
         saved_attachment_urls: List[str] = []
         if attachments:
             import base64
+            if not isinstance(attachments, list) or len(attachments) > 3:
+                raise ValueError("A feedback report may contain at most 3 attachments")
             for idx, item in enumerate(attachments):
-                if not item:
+                if not isinstance(item, str) or not item:
                     continue
                 if item.startswith("data:image/") and ";base64," in item:
                     try:
                         header, b64_data = item.split(";base64,", 1)
+                        # Reject oversized encoded data before decoding and require
+                        # strict base64 to avoid memory/CPU abuse.
+                        if len(b64_data) > 8 * 1024 * 1024:
+                            raise ValueError("attachment is too large")
+                        raw = base64.b64decode(b64_data, validate=True)
+                        if len(raw) > 6 * 1024 * 1024:
+                            raise ValueError("attachment is too large")
                         ext = "png"
                         if "jpeg" in header or "jpg" in header:
                             ext = "jpg"
@@ -102,17 +136,18 @@ class FeedbackManager:
                             ext = "webp"
                         filename = f"{entry.id}_ss_{idx + 1}.{ext}"
                         target = self.attachments_dir / filename
-                        target.write_bytes(base64.b64decode(b64_data))
+                        target.write_bytes(raw)
                         saved_attachment_urls.append(f"/api/feedback/attachment/{filename}")
                     except Exception as err:
                         logger.warning("Failed to decode attachment %d: %s", idx, err)
-                elif item.startswith("/api/feedback/attachment/"):
+                elif item.startswith("/api/feedback/attachment/") and Path(item.rsplit("/", 1)[-1]).name == item.rsplit("/", 1)[-1]:
                     saved_attachment_urls.append(item)
 
         entry.attachments = saved_attachment_urls
-        entries = self._read_all()
-        entries.append(entry.to_dict())
-        self._write_all(entries)
+        with self._lock:
+            entries = self._read_all()
+            entries.append(entry.to_dict())
+            self._write_all(entries)
         logger.info(
             "Feedback submitted: [%s] %s (%s, %d attachments) — %s",
             entry.id, category, severity, len(entry.attachments), message[:60]

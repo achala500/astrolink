@@ -137,13 +137,18 @@ AstroLink operates **100% offline with zero external network pings**.
 
 ### Minting New License Keys (CLI)
 
-```bash
-# Mint a lifetime license
-python -m backend.app.licensing mint "Dr. Elena Vance" "lifetime"
+The signing private key is intentionally **not shipped in the repository or application**. Run the minting command only on a secure licensing workstation:
 
-# Verify a license string offline
+```bash
+export ASTROLINK_LICENSE_MINT_PRIVATE_KEY="<32-byte-ed25519-seed-in-hex>"
+python -m backend.app.licensing mint "Dr. Elena Vance" "lifetime"
+unset ASTROLINK_LICENSE_MINT_PRIVATE_KEY
+
+# Verify a license string offline on any installation
 python -m backend.app.licensing verify "<base64-license-key>"
 ```
+
+Never put `ASTROLINK_LICENSE_MINT_PRIVATE_KEY` in Docker, Render, Railway, Fly.io, browser JavaScript, or a public CI log. The application only contains the verification public key.
 
 ---
 
@@ -178,6 +183,14 @@ curl http://localhost:8080/api/status
 ```
 
 Every provider should wait for `GET /api/status` to return `200` before routing traffic. For a cloud deployment, use a private license key through `ASTROLINK_LICENSE`; never commit a generated license key or camera credentials.
+
+For public deployments, configure the feedback administration token:
+
+```bash
+ASTROLINK_ADMIN_TOKEN="use-a-long-random-secret"
+```
+
+When configured, send `Authorization: Bearer <token>` to feedback listing, exports, status updates, clearing, and attachment download endpoints. Feedback submission remains available to end users. Without this token, those administrative endpoints are intentionally open for local/offline installations only; do not expose that mode publicly.
 
 ### Option A: Render.com (Recommended — Zero Config)
 1. Go to [render.com/new](https://render.com/new) → **New Web Service**.

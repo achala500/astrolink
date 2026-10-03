@@ -25,11 +25,12 @@ logger = logging.getLogger("astrolink.licensing")
 
 # Master hardcoded 32-byte Ed25519 public key (hex-encoded)
 # Used exclusively for in-binary offline verification
-MASTER_PUBLIC_KEY_HEX: str = "1658de0da16562b43a7afbf9fa6e84589ce1c28b260259640dbb17001a4b7dd0"
+MASTER_PUBLIC_KEY_HEX: str = "04f81c9ddd9daad6e3ab41fe937994eeb80e7b4ba54053b5a9e9f83fc9707d31"
 
-# Optional private key for offline key-generation/minting tools and testing
-# In a secure SaaS environment, this key resides solely in the licensing server.
-_MASTER_PRIVATE_KEY_HEX: str = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+# Never embed the signing key in the application. Anyone with a shipped private
+# key could mint unlimited licenses. The optional minting CLI reads this only
+# from the operator's environment; normal installations cannot mint keys.
+MINT_PRIVATE_KEY_ENV = "ASTROLINK_LICENSE_MINT_PRIVATE_KEY"
 
 # Community Trial frame limit for unverified instances
 UNVERIFIED_FRAME_LIMIT: int = 10
@@ -219,9 +220,17 @@ def mint_license(
     Returns:
         Base64-encoded license key string ready for offline deployment.
     """
-    priv_hex = private_key_hex or _MASTER_PRIVATE_KEY_HEX
-    priv_bytes = bytes.fromhex(priv_hex)
-    private_key = ed25519.Ed25519PrivateKey.from_private_bytes(priv_bytes)
+    priv_hex = private_key_hex or os.environ.get(MINT_PRIVATE_KEY_ENV)
+    if not priv_hex:
+        raise ValueError(
+            f"License minting is disabled without {MINT_PRIVATE_KEY_ENV}; "
+            "provide a private key only in a secure operator environment."
+        )
+    try:
+        priv_bytes = bytes.fromhex(priv_hex)
+        private_key = ed25519.Ed25519PrivateKey.from_private_bytes(priv_bytes)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("License minting key must be a 32-byte hexadecimal Ed25519 seed") from exc
 
     # Canonical message format
     if issued_at:

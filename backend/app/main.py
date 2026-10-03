@@ -17,20 +17,23 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hmac
 import io
 import json
 import logging
 import math
+import os
 import shutil
 import socket
 import sys
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, Response, UploadFile, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -60,6 +63,22 @@ from backend.app.pipeline.stretch import auto_stretch
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("astrolink.server")
 MAX_UPLOAD_BYTES = 128 * 1024 * 1024  # protect the field station from accidental huge uploads
+ADMIN_TOKEN = os.environ.get("ASTROLINK_ADMIN_TOKEN", "").strip()
+
+
+def _require_admin_token(request: Request) -> None:
+    """Protect management/feedback endpoints when deployed publicly.
+
+    Local installations remain frictionless when no token is configured. Cloud
+    operators should set ASTROLINK_ADMIN_TOKEN and send it as a Bearer token.
+    """
+    if not ADMIN_TOKEN:
+        return
+    supplied = request.headers.get("authorization", "")
+    if supplied.lower().startswith("bearer "):
+        supplied = supplied[7:].strip()
+    if not supplied or not hmac.compare_digest(supplied, ADMIN_TOKEN):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Administrator authentication required")
 
 
 # =====================================================================
@@ -123,9 +142,16 @@ class AstrophotographySession:
         self.last_preview_webp_b64: Optional[str] = None
         self.last_preview_webp_bytes: Optional[bytes] = None
         self.last_frame_name: Optional[str] = None
+        # Uploads and camera callbacks can arrive on different threads. The
+        # stacker is stateful, so serialize a complete frame transaction.
+        self._lock = threading.RLock()
 
     def reset(self) -> None:
-        """Resets the live stacker and telemetry."""
+        """Resets the live stacker and telemetry atomically."""
+        with self._lock:
+            self._reset_unlocked()
+
+    def _reset_unlocked(self) -> None:
         self.stacker.reset()
         self.fwhm_tracker = RollingFWHMTracker(maxlen=5, blur_threshold_ratio=0.25)
         self.ref_frame = None
@@ -137,6 +163,16 @@ class AstrophotographySession:
         self.last_frame_name = None
 
     def process_sub_exposure(
+        self,
+        image_bytes: Any,
+        filename: str = "frame.jpg",
+        sub_exp_seconds: float = 30.0,
+    ) -> Dict[str, Any]:
+        """Processes one frame atomically across upload and camera threads."""
+        with self._lock:
+            return self._process_sub_exposure(image_bytes, filename, sub_exp_seconds)
+
+    def _process_sub_exposure(
         self,
         image_bytes: Any,
         filename: str = "frame.jpg",
@@ -783,14 +819,17 @@ async def submit_feedback(payload: Dict[str, Any]):
         "intervalometerRunning": intervalometer.is_running,
     }
 
-    entry = feedback_manager.submit(
-        category=category,
-        message=message,
-        severity=severity,
-        device_info=device_info,
-        telemetry_snapshot=telemetry_snapshot,
-        attachments=attachments,
-    )
+    try:
+        entry = feedback_manager.submit(
+            category=category,
+            message=message,
+            severity=severity,
+            device_info=device_info,
+            telemetry_snapshot=telemetry_snapshot,
+            attachments=attachments,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {
         "status": "submitted",
         "feedback_id": entry.id,
@@ -800,8 +839,9 @@ async def submit_feedback(payload: Dict[str, Any]):
 
 
 @app.get("/api/feedback/attachment/{filename}")
-async def get_feedback_attachment(filename: str):
+async def get_feedback_attachment(filename: str, request: Request):
     """Safely serves an attached screenshot or diagnostic image."""
+    _require_admin_token(request)
     path = feedback_manager.get_attachment_path(filename)
     if not path or not path.is_file():
         raise HTTPException(status_code=404, detail="Attachment not found")
@@ -809,8 +849,9 @@ async def get_feedback_attachment(filename: str):
 
 
 @app.get("/api/feedback")
-async def get_feedback():
+async def get_feedback(request: Request):
     """Returns all unresolved feedback entries and statistics."""
+    _require_admin_token(request)
     return {
         "entries": feedback_manager.get_all(),
         "stats": feedback_manager.get_stats(),
@@ -818,14 +859,16 @@ async def get_feedback():
 
 
 @app.get("/api/feedback/export")
-async def export_feedback_for_jules():
+async def export_feedback_for_jules(request: Request):
     """Exports unresolved, pending feedback as formatted GitHub Issues for Jules."""
+    _require_admin_token(request)
     return {"issues": feedback_manager.export_for_jules()}
 
 
 @app.post("/api/feedback/track")
-async def track_user_feedback(payload: Dict[str, Any]):
+async def track_user_feedback(payload: Dict[str, Any], request: Request):
     """Returns status, GitHub issue links, and resolution notes for user-submitted ticket IDs."""
+    _require_admin_token(request)
     ids = payload.get("ids", [])
     if not isinstance(ids, list):
         raise HTTPException(status_code=400, detail="Expected list of ticket IDs")
@@ -834,8 +877,9 @@ async def track_user_feedback(payload: Dict[str, Any]):
 
 
 @app.post("/api/feedback/update")
-async def update_feedback_status(payload: Dict[str, Any]):
+async def update_feedback_status(payload: Dict[str, Any], request: Request):
     """Updates ticket status (e.g. when Jules triages or closes an issue)."""
+    _require_admin_token(request)
     feedback_id = payload.get("id")
     new_status = payload.get("status")
     issue_number = payload.get("issue_number")
@@ -855,8 +899,9 @@ async def update_feedback_status(payload: Dict[str, Any]):
 
 
 @app.post("/api/feedback/clear")
-async def clear_resolved_feedback():
+async def clear_resolved_feedback(request: Request):
     """Clears all resolved feedback entries (called after Jules processes them)."""
+    _require_admin_token(request)
     cleared = feedback_manager.clear_resolved()
     return {"status": "cleared", "count": cleared}
 
