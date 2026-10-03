@@ -41,6 +41,8 @@ class CameraIntervalometer:
 
         self.camera: Any = None
         self._gp: Any = None
+        self._cv2_cap: Any = None
+        self.camera_mode: str = "auto"  # "gphoto2", "opencv", "simulate"
         self._is_connected: bool = False
         self._is_running: bool = False
         self._stop_event = threading.Event()
@@ -57,15 +59,10 @@ class CameraIntervalometer:
             self._gp = gp
         except ImportError:
             self._gp = None
-            if not self.simulate:
-                logger.warning(
-                    "python-gphoto2 not installed. Intervalometer will operate in simulation/mock mode."
-                )
-                self.simulate = True
 
     @property
     def is_connected(self) -> bool:
-        """Returns True if the camera USB session is open."""
+        """Returns True if the camera session is open."""
         return self._is_connected
 
     @property
@@ -74,7 +71,7 @@ class CameraIntervalometer:
         return self._is_running
 
     def connect(self) -> bool:
-        """Initializes the USB camera connection.
+        """Initializes hardware camera connection (DSLR PTP or OpenCV USB Camera).
 
         Returns:
             True if connection established, False otherwise.
@@ -82,27 +79,57 @@ class CameraIntervalometer:
         if self._is_connected:
             return True
 
-        if self.simulate or self._gp is None:
-            logger.info("Intervalometer connected in simulation mode.")
+        # 1. Explicit simulation requested
+        if self.simulate:
+            self.camera_mode = "simulate"
             self._is_connected = True
             self.last_error = None
+            logger.info("Intervalometer connected in explicit simulation mode.")
             return True
 
+        # 2. Try DSLR / Mirrorless USB connection via libgphoto2
+        if self._gp is not None:
+            try:
+                self.camera = self._gp.Camera()
+                self.camera.init()
+                self.camera_mode = "gphoto2"
+                self._is_connected = True
+                self.last_error = None
+                logger.info("USB DSLR / mirrorless camera connected successfully via gphoto2.")
+                return True
+            except Exception as e:
+                logger.debug("No gphoto2 DSLR camera detected: %s", e)
+                self.camera = None
+
+        # 3. Try OpenCV USB / Astronomy / System Camera Device 0
         try:
-            self.camera = self._gp.Camera()
-            self.camera.init()
-            self._is_connected = True
-            self.last_error = None
-            logger.info("USB camera connected successfully via gphoto2.")
-            return True
+            import cv2
+            cap = cv2.VideoCapture(0)
+            if cap.isOpened():
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    self._cv2_cap = cap
+                    self.camera_mode = "opencv"
+                    self._is_connected = True
+                    self.last_error = None
+                    logger.info(
+                        "Hardware camera connected via OpenCV (Device 0, %dx%d px).",
+                        frame.shape[1], frame.shape[0]
+                    )
+                    return True
+                else:
+                    cap.release()
         except Exception as e:
-            self.last_error = f"Failed to connect to USB camera: {str(e)}"
-            logger.error(self.last_error)
-            self._is_connected = False
-            return False
+            logger.debug("OpenCV camera probe failed: %s", e)
+
+        # 4. Fallback to simulation only if NO physical camera is available
+        self.camera_mode = "simulate"
+        self._is_connected = True
+        logger.warning("No physical camera detected. Operating in simulation fallback mode.")
+        return True
 
     def disconnect(self) -> None:
-        """Closes the USB camera session."""
+        """Closes the camera session."""
         self.stop_sequence()
 
         if self.camera and self._gp is not None:
@@ -112,8 +139,15 @@ class CameraIntervalometer:
                 logger.debug("Error while closing camera session: %s", e)
             self.camera = None
 
+        if self._cv2_cap is not None:
+            try:
+                self._cv2_cap.release()
+            except Exception as e:
+                logger.debug("Error closing OpenCV camera: %s", e)
+            self._cv2_cap = None
+
         self._is_connected = False
-        logger.info("USB camera disconnected.")
+        logger.info("Camera disconnected.")
 
     def _set_camera_config(self, key: str, value: Any) -> bool:
         """Helper to modify a camera configuration parameter."""
@@ -137,6 +171,25 @@ class CameraIntervalometer:
         iso: Optional[Any],
     ) -> bytes:
         """Executes a single hardware exposure and fetches data into memory."""
+        import cv2
+
+        # 1. OpenCV USB / System Camera Hardware Capture
+        if self.camera_mode == "opencv" and self._cv2_cap is not None:
+            ret, frame = self._cv2_cap.read()
+            if not ret or frame is None:
+                # Attempt to reopen camera Device 0
+                self._cv2_cap.open(0)
+                ret, frame = self._cv2_cap.read()
+
+            if ret and frame is not None:
+                ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                if ok:
+                    return buf.tobytes()
+
+            # If read failed, generate fallback simulated shot
+            return self._capture_simulated_shot(self.current_frame, exposure_seconds)
+
+        # 2. DSLR / Mirrorless Capture via libgphoto2
         if iso is not None:
             self._set_camera_config("iso", iso)
 
@@ -164,7 +217,6 @@ class CameraIntervalometer:
             return camera_file.get_data_and_size()
         else:
             # Standard shutter speed preset
-            # Map numeric seconds to standard shutter speed string if available
             self._set_camera_config("shutterspeed", f"{exposure_seconds}")
             file_path = self.camera.capture(self._gp.GP_CAPTURE_IMAGE)
             camera_file = self.camera.file_get(
@@ -238,7 +290,7 @@ class CameraIntervalometer:
             logger.info("Executing exposure %d/%d (%.1fs)...", self.current_frame, frame_count, exposure_seconds)
 
             try:
-                if self.simulate or not self.camera:
+                if self.camera_mode == "simulate":
                     # In simulation mode, sleep briefly to simulate exposure
                     sim_exp_time = min(0.5, exposure_seconds)
                     time.sleep(sim_exp_time)

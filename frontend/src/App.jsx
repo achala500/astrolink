@@ -258,6 +258,7 @@ export default function App() {
         isCrimson={isCrimson}
         revealDeepSky={revealDeepSky}
         clearCityGlow={clearCityGlow}
+        backendUrl={httpUrl}
       />
 
       {/* Floating Bottom Ergonomic Pill Dock */}

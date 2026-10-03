@@ -300,7 +300,7 @@ def _on_intervalometer_frame_captured(data: bytes, filename: str, exposure_secon
 
 intervalometer = CameraIntervalometer(
     on_frame_captured=_on_intervalometer_frame_captured,
-    simulate=True,
+    simulate=False,
 )
 
 
