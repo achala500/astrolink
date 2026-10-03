@@ -644,11 +644,11 @@ async def activate_license(payload: Dict[str, Any]):
     if not key:
         raise HTTPException(status_code=400, detail="Missing license key in payload")
 
-    status = license_manager.activate_license(key, persist=True)
-    if not status.is_valid:
+    lic_status = license_manager.activate_license(key, persist=True)
+    if not lic_status.is_valid:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=status.error or "Invalid cryptographic license key",
+            status_code=400,
+            detail=lic_status.error or "Invalid cryptographic license key",
         )
 
     # Broadcast updated telemetry with new license status
@@ -661,13 +661,13 @@ async def activate_license(payload: Dict[str, Any]):
         "snrGain": round(math.sqrt(max(1, stack_count)), 2),
         "alertMessage": "License activated: Unlimited stacking unlocked.",
         "preview": session.last_preview_webp_b64,
-        "license": status.to_dict(),
+        "license": lic_status.to_dict(),
         "intervalometerRunning": intervalometer.is_running,
     })
 
     return {
         "status": "activated",
-        "license": status.to_dict(),
+        "license": lic_status.to_dict(),
     }
 
 
