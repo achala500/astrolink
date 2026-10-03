@@ -179,12 +179,24 @@ class AstrophotographySession:
         try:
             with np.load(self._session_file, allow_pickle=False) as saved:
                 shape = tuple(int(x) for x in saved["shape"])
+                if len(shape) not in (2, 3) or any(dim <= 0 for dim in shape) or int(np.prod(shape)) > 100_000_000:
+                    raise ValueError("persisted frame shape is invalid or too large")
+                mean = saved["mean"]
+                m2 = saved["m2"]
+                counts = saved["counts"]
+                if mean.shape != shape or m2.shape != shape or counts.shape != shape:
+                    raise ValueError("persisted accumulator shapes do not match")
                 self.stacker._init_buffers(shape)
-                self.stacker.mean = saved["mean"].astype(np.float32)
-                self.stacker.m2 = saved["m2"].astype(np.float32)
-                self.stacker.counts = saved["counts"].astype(np.uint32)
+                self.stacker.mean = mean.astype(np.float32)
+                self.stacker.m2 = m2.astype(np.float32)
+                self.stacker.counts = counts.astype(np.uint32)
+                if not np.isfinite(self.stacker.mean).all() or not np.isfinite(self.stacker.m2).all():
+                    raise ValueError("persisted accumulator contains non-finite values")
                 self.stacker.total_frames_processed = int(saved["total_frames"])
-                self.ref_frame = saved["ref_frame"].astype(np.float32)
+                ref_frame = saved["ref_frame"]
+                if ref_frame.shape != shape or not np.isfinite(ref_frame).all():
+                    raise ValueError("persisted reference frame is invalid")
+                self.ref_frame = ref_frame.astype(np.float32)
                 self.total_exp_seconds = float(saved["total_exp_seconds"])
                 self.last_fwhm = float(saved["last_fwhm"])
                 logger.info("Restored persisted AstroLink session (%d frames)", self.stacker.total_frames_processed)
@@ -450,8 +462,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Zero-Config mDNS registration not available or skipped: %s", e)
 
-    import threading
-    threading.Thread(target=_start_mdns, daemon=True, name="mDNS-Broadcast").start()
+    if os.environ.get("ASTROLINK_DISABLE_MDNS", "").lower() not in {"1", "true", "yes"}:
+        threading.Thread(target=_start_mdns, daemon=True, name="mDNS-Broadcast").start()
+    else:
+        logger.info("mDNS disabled by ASTROLINK_DISABLE_MDNS")
 
     # Initialize Hardware Tethering Daemon
     def on_tether_frame(frame: CapturedFrame) -> None:
@@ -459,7 +473,10 @@ async def lifespan(app: FastAPI):
         _on_intervalometer_frame_captured(frame.data, frame.filename, 30.0)
 
     tether_daemon = GPhotoTetherDaemon(on_frame_callback=on_tether_frame, simulate=True)
-    tether_daemon.start()
+    if os.environ.get("ASTROLINK_DISABLE_HARDWARE", "").lower() not in {"1", "true", "yes"}:
+        tether_daemon.start()
+    else:
+        logger.info("Camera tethering disabled by ASTROLINK_DISABLE_HARDWARE")
 
     yield
 
@@ -483,15 +500,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# API calls are same-origin in production and proxied in development.  Keep
-# credentials disabled with a wildcard origin; browsers reject the combination
-# of allow_credentials=True and Access-Control-Allow-Origin: *.
+# Same-origin is the normal deployment. Explicit origins are supported for a
+# separate frontend; wildcard access can be enabled only for local/offline use.
+configured_origins = [origin.strip() for origin in os.environ.get("ASTROLINK_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=configured_origins or ["*"],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 

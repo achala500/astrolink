@@ -370,6 +370,15 @@ def test_export_16bit_tiff_after_stack(client: TestClient) -> None:
     assert tiff_img.max() > 0
 
 
+def test_intervalometer_rejects_invalid_parameters() -> None:
+    """Rejects NaN, infinite, zero, and unreasonably large sequences."""
+    interv = CameraIntervalometer(simulate=True)
+    assert interv.start_sequence(float("nan"), 1) is False
+    assert interv.start_sequence(1.0, 0) is False
+    assert interv.start_sequence(1.0, 10001) is False
+    assert interv.start_sequence(1.0, 1, delay_seconds=float("inf")) is False
+
+
 def test_hardware_tether_daemon() -> None:
     """Verifies GPhotoTetherDaemon USB tethering background worker."""
     received: List[CapturedFrame] = []

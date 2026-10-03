@@ -202,6 +202,16 @@ ASTROLINK_SESSION_FILE=/data/astrolink-session.npz
 
 Without a persistent volume, a cloud restart intentionally clears the in-memory stack.
 
+For cloud deployments with no directly attached camera, also set:
+
+```bash
+ASTROLINK_DISABLE_HARDWARE=true
+ASTROLINK_DISABLE_MDNS=true
+ASTROLINK_ALLOWED_ORIGINS=https://your-frontend.example.com
+```
+
+This prevents misleading hardware discovery, unnecessary tether workers, and useless mDNS broadcasts from cloud containers.
+
 ### Option A: Render.com (Recommended — Zero Config)
 1. Go to [render.com/new](https://render.com/new) → **New Web Service**.
 2. Connect your GitHub repository: `achala500/astrolink`.

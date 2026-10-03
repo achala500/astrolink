@@ -8,6 +8,8 @@ in-memory buffer extraction, and automated delivery to the universal frame loade
 from __future__ import annotations
 
 import logging
+import math
+import os
 import threading
 import time
 from typing import Any, Callable, Dict, Optional
@@ -78,6 +80,10 @@ class CameraIntervalometer:
         """
         if self._is_connected:
             return True
+
+        if os.environ.get("ASTROLINK_DISABLE_HARDWARE", "").lower() in {"1", "true", "yes"}:
+            self.last_error = "Hardware control is disabled in this deployment"
+            return False
 
         # 1. Explicit simulation requested
         if self.simulate:
@@ -300,6 +306,24 @@ class CameraIntervalometer:
         Returns:
             True if sequence launched, False if already running or not connected.
         """
+        try:
+            exposure_seconds = float(exposure_seconds)
+            frame_count = int(frame_count)
+            delay_seconds = float(delay_seconds)
+        except (TypeError, ValueError):
+            self.last_error = "Exposure, frame count, and delay must be numeric"
+            return False
+
+        if not (math.isfinite(exposure_seconds) and 0.1 <= exposure_seconds <= 86400):
+            self.last_error = "Exposure must be between 0.1 and 86400 seconds"
+            return False
+        if not (1 <= frame_count <= 10000):
+            self.last_error = "Frame count must be between 1 and 10000"
+            return False
+        if not (math.isfinite(delay_seconds) and 0 <= delay_seconds <= 86400):
+            self.last_error = "Delay must be between 0 and 86400 seconds"
+            return False
+
         if self._is_running:
             logger.warning("Cannot start sequence: already running.")
             return False
