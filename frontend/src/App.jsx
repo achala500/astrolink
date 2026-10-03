@@ -5,6 +5,7 @@ import Viewport from './components/Viewport';
 import Dock from './components/Dock';
 import SessionSheet from './components/SessionSheet';
 import ExportSheet from './components/ExportSheet';
+import FeedbackSheet from './components/FeedbackSheet';
 import { soundEngine } from './utils/audio';
 
 export default function App() {
@@ -304,6 +305,12 @@ export default function App() {
         gpsCoords={gpsCoords}
         backendUrl={httpUrl}
         previewUrl={previewUrl}
+      />
+
+      {/* Jules Autonomous Feedback System */}
+      <FeedbackSheet
+        isCrimson={isCrimson}
+        backendUrl={httpUrl}
       />
     </div>
   );

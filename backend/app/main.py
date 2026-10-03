@@ -41,6 +41,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from backend.app.hardware.intervalometer import CameraIntervalometer
 from backend.app.hardware.tether import CapturedFrame, GPhotoTetherDaemon
 from backend.app.licensing import license_manager, verify_license_key
+from backend.app.feedback import feedback_manager
 from backend.app.pipeline.alignment import FrameRejectedError, align_frame
 from backend.app.pipeline.gates import (
     RollingFWHMTracker,
@@ -314,32 +315,38 @@ async def lifespan(app: FastAPI):
     zeroconf_instance = None
     service_info = None
 
-    # Startup: Broadcast mDNS astrolink.local on port 8080
-    try:
-        from zeroconf import IPVersion, ServiceInfo, Zeroconf
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # Startup: Broadcast mDNS astrolink.local on port 8080 in background thread
+    def _start_mdns():
+        nonlocal zeroconf_instance, service_info
         try:
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-        except Exception:
-            local_ip = "127.0.0.1"
-        finally:
-            s.close()
+            from zeroconf import IPVersion, ServiceInfo, Zeroconf
 
-        zeroconf_instance = Zeroconf(ip_version=IPVersion.V4Only)
-        service_info = ServiceInfo(
-            type_="_http._tcp.local.",
-            name="astrolink._http._tcp.local.",
-            addresses=[socket.inet_aton(local_ip)],
-            port=8080,
-            server="astrolink.local.",
-            properties={"path": "/"},
-        )
-        zeroconf_instance.register_service(service_info)
-        logger.info("Zero-Config mDNS broadcast active: astrolink.local:8080 on %s", local_ip)
-    except Exception as e:
-        logger.warning("Zero-Config mDNS registration not available or skipped: %s", e)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0.5)
+            try:
+                s.connect(("8.8.8.8", 80))
+                local_ip = s.getsockname()[0]
+            except Exception:
+                local_ip = "127.0.0.1"
+            finally:
+                s.close()
+
+            zeroconf_instance = Zeroconf(ip_version=IPVersion.V4Only)
+            service_info = ServiceInfo(
+                type_="_http._tcp.local.",
+                name="astrolink._http._tcp.local.",
+                addresses=[socket.inet_aton(local_ip)],
+                port=8080,
+                server="astrolink.local.",
+                properties={"path": "/"},
+            )
+            zeroconf_instance.register_service(service_info)
+            logger.info("Zero-Config mDNS broadcast active: astrolink.local:8080 on %s", local_ip)
+        except Exception as e:
+            logger.warning("Zero-Config mDNS registration not available or skipped: %s", e)
+
+    import threading
+    threading.Thread(target=_start_mdns, daemon=True, name="mDNS-Broadcast").start()
 
     # Initialize Hardware Tethering Daemon
     def on_tether_frame(frame: CapturedFrame) -> None:
@@ -679,6 +686,64 @@ async def deactivate_license():
         "status": "deactivated",
         "license": license_manager.status.to_dict(),
     }
+
+
+# ==========================================================================
+# Feedback Collection API (Jules Autonomous Bug Fixing)
+# ==========================================================================
+
+@app.post("/api/feedback")
+async def submit_feedback(payload: Dict[str, Any]):
+    """Submits user feedback for autonomous Jules triage and resolution."""
+    message = payload.get("message", "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Feedback message cannot be empty")
+
+    category = payload.get("category", "general")
+    severity = payload.get("severity", "medium")
+    device_info = payload.get("device_info")
+    
+    # Capture current telemetry snapshot automatically
+    stack_count = session.stacker.total_frames_processed
+    telemetry_snapshot = {
+        "stackCount": stack_count,
+        "totalExp": round(session.total_exp_seconds, 1),
+        "fwhm": session.last_fwhm,
+        "snrGain": round(math.sqrt(max(1, stack_count)), 2),
+        "alertMessage": session.last_alert_message,
+        "intervalometerRunning": intervalometer.is_running,
+    }
+
+    entry = feedback_manager.submit(
+        category=category,
+        message=message,
+        severity=severity,
+        device_info=device_info,
+        telemetry_snapshot=telemetry_snapshot,
+    )
+    return {"status": "submitted", "feedback_id": entry.id}
+
+
+@app.get("/api/feedback")
+async def get_feedback():
+    """Returns all unresolved feedback entries and statistics."""
+    return {
+        "entries": feedback_manager.get_all(),
+        "stats": feedback_manager.get_stats(),
+    }
+
+
+@app.get("/api/feedback/export")
+async def export_feedback_for_jules():
+    """Exports unresolved feedback as formatted GitHub Issues for Jules."""
+    return {"issues": feedback_manager.export_for_jules()}
+
+
+@app.post("/api/feedback/clear")
+async def clear_resolved_feedback():
+    """Clears all resolved feedback entries (called after Jules processes them)."""
+    cleared = feedback_manager.clear_resolved()
+    return {"status": "cleared", "count": cleared}
 
 
 def get_frontend_dist_dir() -> Optional[Path]:
