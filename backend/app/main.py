@@ -735,8 +735,39 @@ async def get_feedback():
 
 @app.get("/api/feedback/export")
 async def export_feedback_for_jules():
-    """Exports unresolved feedback as formatted GitHub Issues for Jules."""
+    """Exports unresolved, pending feedback as formatted GitHub Issues for Jules."""
     return {"issues": feedback_manager.export_for_jules()}
+
+
+@app.post("/api/feedback/track")
+async def track_user_feedback(payload: Dict[str, Any]):
+    """Returns status, GitHub issue links, and resolution notes for user-submitted ticket IDs."""
+    ids = payload.get("ids", [])
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="Expected list of ticket IDs")
+    entries = feedback_manager.get_by_ids(ids)
+    return {"reports": entries, "stats": feedback_manager.get_stats()}
+
+
+@app.post("/api/feedback/update")
+async def update_feedback_status(payload: Dict[str, Any]):
+    """Updates ticket status (e.g. when Jules triages or closes an issue)."""
+    feedback_id = payload.get("id")
+    new_status = payload.get("status")
+    issue_number = payload.get("issue_number")
+    issue_url = payload.get("issue_url")
+    notes = payload.get("notes")
+    if not feedback_id or not new_status:
+        raise HTTPException(status_code=400, detail="Missing id or status")
+
+    success = feedback_manager.update_triage_status(
+        feedback_id=feedback_id,
+        status=new_status,
+        issue_number=issue_number,
+        issue_url=issue_url,
+        notes=notes,
+    )
+    return {"success": success}
 
 
 @app.post("/api/feedback/clear")
