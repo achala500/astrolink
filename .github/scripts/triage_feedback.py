@@ -154,6 +154,13 @@ def triage_feedback():
             "crash": "bug",
         }.get(category, "feedback")
 
+        attachments = entry.get("attachments") or []
+        attachments_md = ""
+        if attachments:
+            attachments_md = "\n### Attached Screenshots & Diagnostics\n"
+            for idx, att in enumerate(attachments):
+                attachments_md += f"- Screenshot {idx + 1}: `{att}`\n"
+
         title = f"[{category.upper()}] {message[:70]} (#{feedback_id})"
         body = f"""## User Feedback Report (Auto-Triaged for Jules)
 
@@ -167,7 +174,7 @@ def triage_feedback():
 
 ### Description
 {message}
-
+{attachments_md}
 ### Real-Time Field Telemetry Snapshot
 ```json
 {json.dumps(telemetry, indent=2)}
@@ -177,7 +184,7 @@ def triage_feedback():
 
 ### Autonomous Instructions for Jules
 @jules — Please evaluate and resolve this field report:
-1. **Root Cause Analysis**: Inspect codebase relevant to `{category}`.
+1. **Root Cause Analysis**: Inspect codebase and attached screenshots relevant to `{category}`.
 2. **Implementation**: Fix bugs or apply optimizations without breaking existing pipeline tests.
 3. **Verification**: Run `python -m pytest backend/ -v` to ensure 100% test pass rate.
 4. **Pull Request**: Open a PR referencing this issue and auto-close when merged.

@@ -21,6 +21,7 @@ import io
 import json
 import logging
 import math
+import shutil
 import socket
 import sys
 from contextlib import asynccontextmanager
@@ -31,13 +32,14 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, Response, UploadFile, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 # Ensure backend package can be resolved
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from backend.app.hardware.detector import camera_detector
 from backend.app.hardware.intervalometer import CameraIntervalometer
 from backend.app.hardware.tether import CapturedFrame, GPhotoTetherDaemon
 from backend.app.licensing import license_manager, verify_license_key
@@ -691,12 +693,51 @@ async def deactivate_license():
 
 
 # ==========================================================================
-# Feedback Collection API (Jules Autonomous Bug Fixing)
+# ==========================================================================
+# Camera & Hardware Direct Detection API
+# ==========================================================================
+
+@app.get("/api/camera/detect")
+async def detect_connected_cameras():
+    """Scans USB and local mounts across Windows, Linux, and macOS for cameras.
+    
+    Identifies DSLR PTP (Canon, Nikon, Sony), Astro CMOS (ZWO, QHY, SVBONY),
+    and SD Card DCIM hot-folders without requiring a web browser on the camera.
+    """
+    discovered = camera_detector.scan()
+    return {
+        "cameras": [c.to_dict() for c in discovered],
+        "count": len(discovered),
+        "platform": sys.platform,
+        "gphoto_available": bool(shutil.which("gphoto2")),
+        "recommendation": (
+            "Ready for tethered capture."
+            if discovered
+            else "Connect camera via USB cable in Manual/Bulb mode, or insert camera SD card."
+        ),
+    }
+
+
+@app.get("/api/camera/status")
+async def get_camera_status():
+    """Returns real-time status of intervalometer and camera tether connection."""
+    return {
+        "connected": intervalometer.is_connected,
+        "running": intervalometer.is_running,
+        "camera_mode": intervalometer.camera_mode,
+        "current_frame": intervalometer.current_frame,
+        "total_frames": intervalometer.total_frames,
+        "last_error": intervalometer.last_error,
+    }
+
+
+# ==========================================================================
+# Feedback Collection API (Jules Autonomous Bug Fixing with Screenshots)
 # ==========================================================================
 
 @app.post("/api/feedback")
 async def submit_feedback(payload: Dict[str, Any]):
-    """Submits user feedback for autonomous Jules triage and resolution."""
+    """Submits user feedback with optional screenshot attachments for autonomous Jules triage."""
     message = payload.get("message", "").strip()
     if not message:
         raise HTTPException(status_code=400, detail="Feedback message cannot be empty")
@@ -704,6 +745,7 @@ async def submit_feedback(payload: Dict[str, Any]):
     category = payload.get("category", "general")
     severity = payload.get("severity", "medium")
     device_info = payload.get("device_info")
+    attachments = payload.get("attachments", [])
     
     # Capture current telemetry snapshot automatically
     stack_count = session.stacker.total_frames_processed
@@ -722,8 +764,23 @@ async def submit_feedback(payload: Dict[str, Any]):
         severity=severity,
         device_info=device_info,
         telemetry_snapshot=telemetry_snapshot,
+        attachments=attachments,
     )
-    return {"status": "submitted", "feedback_id": entry.id}
+    return {
+        "status": "submitted",
+        "feedback_id": entry.id,
+        "attachments_count": len(entry.attachments),
+        "attachments": entry.attachments,
+    }
+
+
+@app.get("/api/feedback/attachment/{filename}")
+async def get_feedback_attachment(filename: str):
+    """Safely serves an attached screenshot or diagnostic image."""
+    path = feedback_manager.get_attachment_path(filename)
+    if not path or not path.is_file():
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    return FileResponse(path)
 
 
 @app.get("/api/feedback")

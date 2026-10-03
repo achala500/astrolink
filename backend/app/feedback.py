@@ -32,6 +32,7 @@ class FeedbackEntry:
     severity: str = "medium"  # low, medium, high, critical
     device_info: Optional[str] = None
     telemetry_snapshot: Optional[Dict[str, Any]] = None
+    attachments: List[str] = field(default_factory=list)  # Stored attachment URLs/paths
     status: str = "pending"  # pending, triaged, in_progress, resolved
     resolved: bool = False
     jules_issue_number: Optional[int] = None
@@ -48,10 +49,12 @@ class FeedbackManager:
 
     def __init__(self, feedback_file: Path = FEEDBACK_FILE):
         self.feedback_file = feedback_file
+        self.attachments_dir = feedback_file.parent / "attachments"
         self._ensure_storage()
 
     def _ensure_storage(self):
         self.feedback_file.parent.mkdir(parents=True, exist_ok=True)
+        self.attachments_dir.mkdir(parents=True, exist_ok=True)
         if not self.feedback_file.exists():
             self.feedback_file.write_text(json.dumps([], indent=2), encoding="utf-8")
 
@@ -71,8 +74,9 @@ class FeedbackManager:
         severity: str = "medium",
         device_info: Optional[str] = None,
         telemetry_snapshot: Optional[Dict[str, Any]] = None,
+        attachments: Optional[List[str]] = None,
     ) -> FeedbackEntry:
-        """Submits a new feedback item with initial status 'pending'."""
+        """Submits a new feedback item with optional screenshot attachments."""
         entry = FeedbackEntry(
             category=category,
             message=message,
@@ -81,11 +85,47 @@ class FeedbackManager:
             telemetry_snapshot=telemetry_snapshot,
             status="pending",
         )
+
+        saved_attachment_urls: List[str] = []
+        if attachments:
+            import base64
+            for idx, item in enumerate(attachments):
+                if not item:
+                    continue
+                if item.startswith("data:image/") and ";base64," in item:
+                    try:
+                        header, b64_data = item.split(";base64,", 1)
+                        ext = "png"
+                        if "jpeg" in header or "jpg" in header:
+                            ext = "jpg"
+                        elif "webp" in header:
+                            ext = "webp"
+                        filename = f"{entry.id}_ss_{idx + 1}.{ext}"
+                        target = self.attachments_dir / filename
+                        target.write_bytes(base64.b64decode(b64_data))
+                        saved_attachment_urls.append(f"/api/feedback/attachment/{filename}")
+                    except Exception as err:
+                        logger.warning("Failed to decode attachment %d: %s", idx, err)
+                elif item.startswith("/api/feedback/attachment/"):
+                    saved_attachment_urls.append(item)
+
+        entry.attachments = saved_attachment_urls
         entries = self._read_all()
         entries.append(entry.to_dict())
         self._write_all(entries)
-        logger.info("Feedback submitted: [%s] %s (%s) — %s", entry.id, category, severity, message[:60])
+        logger.info(
+            "Feedback submitted: [%s] %s (%s, %d attachments) — %s",
+            entry.id, category, severity, len(entry.attachments), message[:60]
+        )
         return entry
+
+    def get_attachment_path(self, filename: str) -> Optional[Path]:
+        """Resolves an attachment path safely preventing path traversal."""
+        safe_name = Path(filename).name
+        target = self.attachments_dir / safe_name
+        if target.exists() and target.is_file():
+            return target
+        return None
 
     def get_all(self, include_resolved: bool = False) -> List[dict]:
         """Returns entries, optionally including resolved ones."""
@@ -200,6 +240,12 @@ class FeedbackManager:
                 "crash": "bug",
             }.get(entry.get("category", "general"), "feedback")
 
+            attachments_md = ""
+            if entry.get("attachments"):
+                attachments_md = "\n### Attached Screenshots & Diagnostics\n"
+                for idx, att in enumerate(entry.get("attachments", [])):
+                    attachments_md += f"- Screenshot {idx + 1}: `{att}`\n"
+
             title = f"[{entry.get('category', 'feedback').upper()}] {entry.get('message', '')[:80]}"
             body = f"""## User Feedback Report (Auto-Triaged)
 
@@ -211,7 +257,7 @@ class FeedbackManager:
 
 ### Description
 {entry.get('message', 'No description provided.')}
-
+{attachments_md}
 ### Telemetry Snapshot
 ```json
 {json.dumps(entry.get('telemetry_snapshot') or {}, indent=2)}
