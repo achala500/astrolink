@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Camera,
@@ -20,7 +21,7 @@ export default function CameraModal({ isOpen, onClose, isCrimson, backendUrl }) 
     setIsScanning(true);
     soundEngine.playClick();
     try {
-      const res = await fetch(`${backendUrl || ''}/api/camera/detect`);
+      const res = await apiFetch(`${backendUrl || ''}/api/camera/detect`);
       if (res.ok) {
         const data = await res.json();
         setDetectedCameras(data.cameras || []);

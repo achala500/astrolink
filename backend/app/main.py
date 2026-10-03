@@ -63,7 +63,31 @@ from backend.app.pipeline.stretch import auto_stretch
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("astrolink.server")
 MAX_UPLOAD_BYTES = 128 * 1024 * 1024  # protect the field station from accidental huge uploads
-ADMIN_TOKEN = os.environ.get("ASTROLINK_ADMIN_TOKEN", "").strip()
+
+def _extract_bearer_token(request: Request) -> str:
+    supplied = request.headers.get("authorization", "")
+    if supplied.lower().startswith("bearer "):
+        return supplied[7:].strip()
+    return ""
+
+
+def _require_api_token(request: Request) -> None:
+    """Protect state-changing/data endpoints when API auth is configured."""
+    expected = os.environ.get("ASTROLINK_API_TOKEN", "").strip()
+    if expected and not hmac.compare_digest(_extract_bearer_token(request), expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API authentication required")
+
+
+def _require_ws_token(websocket: WebSocket) -> None:
+    expected = os.environ.get("ASTROLINK_API_TOKEN", "").strip()
+    if not expected:
+        return
+    supplied = websocket.query_params.get("token", "")
+    auth = websocket.headers.get("authorization", "")
+    if not supplied and auth.lower().startswith("bearer "):
+        supplied = auth[7:].strip()
+    if not supplied or not hmac.compare_digest(supplied, expected):
+        raise RuntimeError("WebSocket authentication required")
 
 
 def _require_admin_token(request: Request) -> None:
@@ -72,12 +96,11 @@ def _require_admin_token(request: Request) -> None:
     Local installations remain frictionless when no token is configured. Cloud
     operators should set ASTROLINK_ADMIN_TOKEN and send it as a Bearer token.
     """
-    if not ADMIN_TOKEN:
+    expected = os.environ.get("ASTROLINK_ADMIN_TOKEN", "").strip()
+    if not expected:
         return
-    supplied = request.headers.get("authorization", "")
-    if supplied.lower().startswith("bearer "):
-        supplied = supplied[7:].strip()
-    if not supplied or not hmac.compare_digest(supplied, ADMIN_TOKEN):
+    supplied = _extract_bearer_token(request)
+    if not supplied or not hmac.compare_digest(supplied, expected):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Administrator authentication required")
 
 
@@ -145,6 +168,43 @@ class AstrophotographySession:
         # Uploads and camera callbacks can arrive on different threads. The
         # stacker is stateful, so serialize a complete frame transaction.
         self._lock = threading.RLock()
+        configured_session = os.environ.get("ASTROLINK_SESSION_FILE", "").strip()
+        self._session_file = Path(configured_session).expanduser() if configured_session else None
+        self._load_persisted_session()
+
+    def _load_persisted_session(self) -> None:
+        """Restore an optional session snapshot from a mounted persistent volume."""
+        if not self._session_file or not self._session_file.is_file():
+            return
+        try:
+            with np.load(self._session_file, allow_pickle=False) as saved:
+                shape = tuple(int(x) for x in saved["shape"])
+                self.stacker._init_buffers(shape)
+                self.stacker.mean = saved["mean"].astype(np.float32)
+                self.stacker.m2 = saved["m2"].astype(np.float32)
+                self.stacker.counts = saved["counts"].astype(np.uint32)
+                self.stacker.total_frames_processed = int(saved["total_frames"])
+                self.ref_frame = saved["ref_frame"].astype(np.float32)
+                self.total_exp_seconds = float(saved["total_exp_seconds"])
+                self.last_fwhm = float(saved["last_fwhm"])
+                logger.info("Restored persisted AstroLink session (%d frames)", self.stacker.total_frames_processed)
+        except Exception as exc:
+            logger.warning("Ignoring invalid persisted session snapshot: %s", exc)
+
+    def _persist_session(self) -> None:
+        if not self._session_file or self.stacker.mean is None or self.stacker.m2 is None or self.stacker.counts is None or self.ref_frame is None:
+            return
+        self._session_file.parent.mkdir(parents=True, exist_ok=True)
+        temp = self._session_file.with_suffix(self._session_file.suffix + ".tmp")
+        try:
+            np.savez_compressed(temp, shape=np.asarray(self.stacker.mean.shape, dtype=np.int64), mean=self.stacker.mean, m2=self.stacker.m2, counts=self.stacker.counts, total_frames=np.asarray(self.stacker.total_frames_processed), ref_frame=self.ref_frame, total_exp_seconds=np.asarray(self.total_exp_seconds), last_fwhm=np.asarray(self.last_fwhm))
+            generated = Path(str(temp) + ".npz")
+            generated.replace(temp)
+            temp.replace(self._session_file)
+        except Exception as exc:
+            logger.warning("Could not persist session snapshot: %s", exc)
+            temp.unlink(missing_ok=True)
+            Path(str(temp) + ".npz").unlink(missing_ok=True)
 
     def reset(self) -> None:
         """Resets the live stacker and telemetry atomically."""
@@ -161,6 +221,8 @@ class AstrophotographySession:
         self.last_preview_webp_b64 = None
         self.last_preview_webp_bytes = None
         self.last_frame_name = None
+        if self._session_file:
+            self._session_file.unlink(missing_ok=True)
 
     def process_sub_exposure(
         self,
@@ -258,6 +320,7 @@ class AstrophotographySession:
         self.stacker.add_frame(aligned_frame, mask=streak_mask)
         self.total_exp_seconds += sub_exp_seconds
         self.last_frame_name = filename
+        self._persist_session()
 
         # 7. Background Gradient Removal
         stacked_raw = self.stacker.get_result()
@@ -471,12 +534,13 @@ async def captive_windows():
 
 
 @app.post("/api/upload")
-async def upload_frame(file: UploadFile = File(...)):
+async def upload_frame(request: Request, file: UploadFile = File(...)):
     """Ingests multipart sub-exposures through universal decoding into WelfordStacker.
 
     Supports FITS, DSLR RAWs, Linear DNGs, TIFF, JPEG, PNG, and WebP formats.
     Broadcasts real-time telemetry and 1080p WebP previews across WebSocket clients.
     """
+    _require_api_token(request)
     try:
         data = await file.read(MAX_UPLOAD_BYTES + 1)
         if len(data) > MAX_UPLOAD_BYTES:
@@ -533,8 +597,9 @@ async def upload_frame(file: UploadFile = File(...)):
 
 
 @app.get("/api/export")
-async def export_master_stack():
+async def export_master_stack(request: Request):
     """Exports current master stack as an uncompressed 16-bit TIFF using tifffile."""
+    _require_api_token(request)
     if session.stacker.mean is None or session.stacker.total_frames_processed == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -571,6 +636,11 @@ async def export_master_stack():
 @app.websocket("/ws")
 async def websocket_telemetry(websocket: WebSocket):
     """Streams real-time telemetry/previews and executes hardware camera control commands."""
+    try:
+        _require_ws_token(websocket)
+    except RuntimeError:
+        await websocket.close(code=1008, reason="Authentication required")
+        return
     await ws_manager.connect(websocket)
 
     # Dispatch current telemetry state upon connection
@@ -686,8 +756,9 @@ async def get_status():
 
 
 @app.post("/api/reset")
-async def reset_session():
+async def reset_session(request: Request):
     """Resets current stacking session."""
+    _require_api_token(request)
     session.reset()
     payload = {
         "type": "telemetry",
@@ -710,8 +781,9 @@ async def get_license_status():
 
 
 @app.post("/api/license/activate")
-async def activate_license(payload: Dict[str, Any]):
+async def activate_license(payload: Dict[str, Any], request: Request):
     """Activates an offline cryptographic license key."""
+    _require_api_token(request)
     key = payload.get("key") or payload.get("license_key") or ""
     if not key:
         raise HTTPException(status_code=400, detail="Missing license key in payload")
@@ -744,8 +816,9 @@ async def activate_license(payload: Dict[str, Any]):
 
 
 @app.post("/api/license/deactivate")
-async def deactivate_license():
+async def deactivate_license(request: Request):
     """Deactivates active license and reverts to community trial mode."""
+    _require_api_token(request)
     license_manager.deactivate()
     return {
         "status": "deactivated",
@@ -759,12 +832,13 @@ async def deactivate_license():
 # ==========================================================================
 
 @app.get("/api/camera/detect")
-async def detect_connected_cameras():
+async def detect_connected_cameras(request: Request):
     """Scans USB and local mounts across Windows, Linux, and macOS for cameras.
     
     Identifies DSLR PTP (Canon, Nikon, Sony), Astro CMOS (ZWO, QHY, SVBONY),
     and SD Card DCIM hot-folders without requiring a web browser on the camera.
     """
+    _require_api_token(request)
     discovered = camera_detector.scan()
     return {
         "cameras": [c.to_dict() for c in discovered],
@@ -780,8 +854,9 @@ async def detect_connected_cameras():
 
 
 @app.get("/api/camera/status")
-async def get_camera_status():
+async def get_camera_status(request: Request):
     """Returns real-time status of intervalometer and camera tether connection."""
+    _require_api_token(request)
     return {
         "connected": intervalometer.is_connected,
         "running": intervalometer.is_running,

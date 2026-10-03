@@ -9,6 +9,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { soundEngine } from '../utils/audio';
+import { apiFetch } from '../utils/api';
 
 /**
  * Controls — Actions & Post-Processing Footer
@@ -39,7 +40,7 @@ export default function Controls({
       soundEngine.playClick();
 
       const exportEndpoint = `${backendUrl || ''}/api/export`;
-      const response = await fetch(exportEndpoint);
+      const response = await apiFetch(exportEndpoint);
       if (!response.ok) {
         throw new Error(`Export failed: ${response.statusText}`);
       }

@@ -192,6 +192,16 @@ ASTROLINK_ADMIN_TOKEN="use-a-long-random-secret"
 
 When configured, send `Authorization: Bearer <token>` to feedback listing, exports, status updates, clearing, and attachment download endpoints. Feedback submission remains available to end users. Without this token, those administrative endpoints are intentionally open for local/offline installations only; do not expose that mode publicly.
 
+For a private cloud API, also set `ASTROLINK_API_TOKEN`. This protects frame upload, export, reset, camera detection/status, license activation/deactivation, and WebSocket commands. Build the frontend with the matching `VITE_ASTROLINK_API_TOKEN`; it will attach the token to API requests and the WebSocket connection. Do not use this mode for a public multi-user application because browser users can inspect any token embedded in their frontend bundle.
+
+To preserve a stack across a restart, mount persistent storage and set:
+
+```bash
+ASTROLINK_SESSION_FILE=/data/astrolink-session.npz
+```
+
+Without a persistent volume, a cloud restart intentionally clears the in-memory stack.
+
 ### Option A: Render.com (Recommended — Zero Config)
 1. Go to [render.com/new](https://render.com/new) → **New Web Service**.
 2. Connect your GitHub repository: `achala500/astrolink`.

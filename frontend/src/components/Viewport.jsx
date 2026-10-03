@@ -12,6 +12,7 @@ import {
   Loader2 
 } from 'lucide-react';
 import { soundEngine } from '../utils/audio';
+import { apiFetch } from '../utils/api';
 
 export default function Viewport({ 
   previewUrl, 
@@ -415,7 +416,7 @@ export default function Viewport({
       formData.append('file', file);
 
       try {
-        const res = await fetch(`${backendUrl || ''}/api/upload`, {
+        const res = await apiFetch(`${backendUrl || ''}/api/upload`, {
           method: 'POST',
           body: formData,
         });
@@ -527,7 +528,7 @@ export default function Viewport({
       const formData = new FormData();
       formData.append('file', file);
       try {
-        await fetch(`${backendUrl || ''}/api/upload`, {
+        await apiFetch(`${backendUrl || ''}/api/upload`, {
           method: 'POST',
           body: formData,
         });

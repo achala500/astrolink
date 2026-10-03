@@ -58,8 +58,10 @@ export default function App() {
   // Vite proxies these paths to the local API during development.
   const getBackendUrls = () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const token = import.meta.env.VITE_ASTROLINK_API_TOKEN;
+    const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
     return {
-      wsUrl: `${protocol}//${window.location.host}/ws`,
+      wsUrl: `${protocol}//${window.location.host}/ws${tokenQuery}`,
       httpUrl: '',
     };
   };
