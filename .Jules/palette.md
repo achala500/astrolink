@@ -1,0 +1,3 @@
+## 2025-05-15 - Dual Theme Focus Ring Styling & ARIA State Attributes
+**Learning:** For floating HUD bars and docks with specialized dark/crimson astro night-vision modes, standard browser outline ring colors can clash or become invisible. Adding mode-aware `focus-visible:ring-2` with appropriate color contrast and explicit `aria-pressed` / `aria-label` attributes ensures screen readers and keyboard users maintain clear focus and state feedback without destroying night-adapted visual comfort.
+**Action:** Always include explicit `aria-label`, `aria-pressed`, and theme-matched `focus-visible:ring-*` styles on custom icon-only and toggle buttons in bottom docks and floating action bars.
