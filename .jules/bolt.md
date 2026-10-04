@@ -1,0 +1,3 @@
+## 2026-03-31 - Redundant Grayscale Conversions and Separate Percentile Pass Bottleneck in Star Alignment
+**Learning:** In NumPy/OpenCV image pipelines, calling `np.percentile` sequentially (e.g., for lower and upper clipping thresholds) forces multiple `np.partition` scans over multi-megapixel arrays. Additionally, helper routines that re-convert raw frames to uint8 grayscale inside sub-functions (like `count_stars`) cause redundant 4x extractions per frame alignment.
+**Action:** Always compute multiple percentiles in a single joint `np.percentile(sample, (q1, q2))` call, use strided subsampling for large arrays, and pass pre-converted uint8 grayscale representations to downstream analysis routines.

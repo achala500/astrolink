@@ -32,11 +32,15 @@ def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
         gray = image
 
     if gray.dtype == np.uint8:
-        return gray.copy()
+        return gray
 
-    img = gray.astype(np.float32)
-    p_low = float(np.percentile(img, 1))
-    p_high = float(np.percentile(img, 99.8))
+    # Performance optimization:
+    # 1. Compute lower and upper percentiles in a single joint np.percentile pass.
+    # 2. Use strided subsampling for frames >250k pixels to accelerate percentile estimation.
+    img = gray.astype(np.float32, copy=False)
+    sample = img[::2, ::2] if img.size > 250000 else img
+    p_low, p_high = np.percentile(sample, (1.0, 99.8))
+    p_low, p_high = float(p_low), float(p_high)
 
     if p_high <= p_low:
         p_low, p_high = float(np.min(img)), float(np.max(img))
@@ -94,8 +98,10 @@ def align_frame(
     new_u8 = _extract_gray_u8(new_frame)
 
     # Rejection Gate 1: Star count drop > 40% (clouds, thick fog, dew)
-    n_ref_stars = count_stars(ref_frame)
-    n_new_stars = count_stars(new_frame)
+    # Performance optimization: pass pre-extracted ref_u8 and new_u8 to avoid
+    # re-calculating grayscale conversion and percentiles inside count_stars.
+    n_ref_stars = count_stars(ref_u8)
+    n_new_stars = count_stars(new_u8)
 
     if n_ref_stars > 0:
         star_drop = (n_ref_stars - n_new_stars) / float(n_ref_stars)
