@@ -42,10 +42,11 @@ export default function Dock({
               soundEngine.playClick();
               onOpenSettings();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            aria-label="Configure Exposure Sequence"
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border focus-visible:outline-none focus-visible:ring-2 ${
               isCrimson 
-                ? 'hover:bg-red-950/40 border-transparent hover:border-red-800/40 text-red-400' 
-                : 'hover:bg-white/10 border-transparent hover:border-white/10 text-slate-300'
+                ? 'hover:bg-red-950/40 border-transparent hover:border-red-800/40 text-red-400 focus-visible:ring-red-500'
+                : 'hover:bg-white/10 border-transparent hover:border-white/10 text-slate-300 focus-visible:ring-amber-400'
             }`}
             title="Configure Exposure Sequence"
           >
@@ -60,14 +61,16 @@ export default function Dock({
               soundEngine.playClick();
               onToggleRevealDeepSky();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            aria-label="Reveal Deep Sky (PixInsight MTF Stretch)"
+            aria-pressed={revealDeepSky}
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border focus-visible:outline-none focus-visible:ring-2 ${
               revealDeepSky 
                 ? (isCrimson 
-                    ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50' 
-                    : 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-lg shadow-amber-950/50')
+                    ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50 focus-visible:ring-red-500'
+                    : 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-lg shadow-amber-950/50 focus-visible:ring-amber-400')
                 : (isCrimson 
-                    ? 'border-transparent hover:bg-red-950/40 text-red-500/60' 
-                    : 'border-transparent hover:bg-white/5 text-slate-400')
+                    ? 'border-transparent hover:bg-red-950/40 text-red-500/60 focus-visible:ring-red-500'
+                    : 'border-transparent hover:bg-white/5 text-slate-400 focus-visible:ring-amber-400')
             }`}
             title="Reveal Deep Sky (PixInsight MTF Stretch)"
           >
@@ -82,14 +85,16 @@ export default function Dock({
               soundEngine.playClick();
               onToggleClearCityGlow();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            aria-label="Clear City Glow (2nd Order Polynomial Removal)"
+            aria-pressed={clearCityGlow}
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border focus-visible:outline-none focus-visible:ring-2 ${
               clearCityGlow 
                 ? (isCrimson 
-                    ? 'bg-red-900/40 border-red-600 text-red-300' 
-                    : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300')
+                    ? 'bg-red-900/40 border-red-600 text-red-300 focus-visible:ring-red-500'
+                    : 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 focus-visible:ring-cyan-400')
                 : (isCrimson 
-                    ? 'border-transparent hover:bg-red-950/40 text-red-500/60' 
-                    : 'border-transparent hover:bg-white/5 text-slate-400')
+                    ? 'border-transparent hover:bg-red-950/40 text-red-500/60 focus-visible:ring-red-500'
+                    : 'border-transparent hover:bg-white/5 text-slate-400 focus-visible:ring-cyan-400')
             }`}
             title="Clear City Glow (2nd Order Polynomial Removal)"
           >
@@ -107,10 +112,11 @@ export default function Dock({
                 soundEngine.playClick();
                 onStopSequence();
               }}
-              className={`h-12 px-5 sm:px-6 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${
+              aria-label="Pause exposure run"
+              className={`h-12 px-5 sm:px-6 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl focus-visible:outline-none focus-visible:ring-2 ${
                 isCrimson 
-                  ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/30' 
-                  : 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/25'
+                  ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/30 focus-visible:ring-red-400'
+                  : 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/25 focus-visible:ring-amber-300'
               }`}
             >
               <Square className="w-4 h-4 fill-current" />
@@ -123,10 +129,11 @@ export default function Dock({
                 soundEngine.playClick();
                 onStartSequence();
               }}
-              className={`h-12 px-5 sm:px-7 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${
+              aria-label="Start exposure sequence"
+              className={`h-12 px-5 sm:px-7 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl focus-visible:outline-none focus-visible:ring-2 ${
                 isCrimson 
-                  ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/40' 
-                  : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/30'
+                  ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/40 focus-visible:ring-red-400'
+                  : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/30 focus-visible:ring-emerald-300'
               }`}
             >
               <Play className="w-4 h-4 fill-current" />
@@ -146,10 +153,11 @@ export default function Dock({
                 onResetStack();
               }
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
+            aria-label="Reset master stack"
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border focus-visible:outline-none focus-visible:ring-2 ${
               isCrimson 
-                ? 'border-transparent hover:bg-red-950/40 text-red-500/70 hover:text-red-400' 
-                : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
+                ? 'border-transparent hover:bg-red-950/40 text-red-500/70 hover:text-red-400 focus-visible:ring-red-500'
+                : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200 focus-visible:ring-amber-400'
             }`}
             title="Reset Master Stack"
           >
@@ -163,10 +171,11 @@ export default function Dock({
               soundEngine.playClick();
               onOpenExport();
             }}
-            className={`min-w-[48px] h-12 px-3.5 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            aria-label="Export 16-Bit TIFF Master"
+            className={`min-w-[48px] h-12 px-3.5 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border focus-visible:outline-none focus-visible:ring-2 ${
               isCrimson 
-                ? 'border-red-900/60 bg-red-950/30 hover:bg-red-900/40 text-red-400' 
-                : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
+                ? 'border-red-900/60 bg-red-950/30 hover:bg-red-900/40 text-red-400 focus-visible:ring-red-500'
+                : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 focus-visible:ring-amber-400'
             }`}
             title="Export 16-Bit TIFF Master"
           >
@@ -181,10 +190,12 @@ export default function Dock({
               soundEngine.playClick();
               onToggleCrimson();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
+            aria-label="Toggle OLED Night Crimson Mode"
+            aria-pressed={isCrimson}
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border focus-visible:outline-none focus-visible:ring-2 ${
               isCrimson 
-                ? 'bg-red-600 text-black border-red-500' 
-                : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
+                ? 'bg-red-600 text-black border-red-500 focus-visible:ring-red-400'
+                : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200 focus-visible:ring-amber-400'
             }`}
             title="Toggle OLED Night Crimson Mode"
           >

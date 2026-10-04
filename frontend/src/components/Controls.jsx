@@ -82,14 +82,16 @@ export default function Controls({
               soundEngine.playClick();
               onToggleRevealDeepSky();
             }}
-            className={`min-h-[48px] px-4 rounded-2xl flex items-center gap-2 text-xs font-medium transition-all active:scale-95 border ${
+            aria-label="Reveal Deep Sky (MTF Auto-Stretch)"
+            aria-pressed={revealDeepSky}
+            className={`min-h-[48px] px-4 rounded-2xl flex items-center gap-2 text-xs font-medium transition-all active:scale-95 border focus-visible:outline-none focus-visible:ring-2 ${
               revealDeepSky
                 ? (isCrimson 
-                    ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50' 
-                    : 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-lg shadow-amber-950/50')
+                    ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50 focus-visible:ring-red-500'
+                    : 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-lg shadow-amber-950/50 focus-visible:ring-amber-400')
                 : (isCrimson 
-                    ? 'bg-red-950/20 border-red-900/30 text-red-500/60 hover:bg-red-950/40' 
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10')
+                    ? 'bg-red-950/20 border-red-900/30 text-red-500/60 hover:bg-red-950/40 focus-visible:ring-red-500'
+                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 focus-visible:ring-amber-400')
             }`}
             title="Reveal Deep Sky (MTF Auto-Stretch)"
           >
@@ -104,14 +106,16 @@ export default function Controls({
               soundEngine.playClick();
               onToggleClearCityGlow();
             }}
-            className={`min-h-[48px] px-4 rounded-2xl flex items-center gap-2 text-xs font-medium transition-all active:scale-95 border ${
+            aria-label="Clear City Glow (Remove Light Pollution)"
+            aria-pressed={clearCityGlow}
+            className={`min-h-[48px] px-4 rounded-2xl flex items-center gap-2 text-xs font-medium transition-all active:scale-95 border focus-visible:outline-none focus-visible:ring-2 ${
               clearCityGlow
                 ? (isCrimson 
-                    ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50' 
-                    : 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300 shadow-lg shadow-cyan-950/50')
+                    ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50 focus-visible:ring-red-500'
+                    : 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300 shadow-lg shadow-cyan-950/50 focus-visible:ring-cyan-400')
                 : (isCrimson 
-                    ? 'bg-red-950/20 border-red-900/30 text-red-500/60 hover:bg-red-950/40' 
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10')
+                    ? 'bg-red-950/20 border-red-900/30 text-red-500/60 hover:bg-red-950/40 focus-visible:ring-red-500'
+                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 focus-visible:ring-cyan-400')
             }`}
             title="Clear City Glow (Remove Light Pollution)"
           >
@@ -127,14 +131,16 @@ export default function Controls({
                 soundEngine.playClick();
                 onToggleCleanStarlight();
               }}
-              className={`min-h-[48px] px-4 rounded-2xl flex items-center gap-2 text-xs font-medium transition-all active:scale-95 border ${
+              aria-label="Clean Starlight (Sigma-Clipping satellite and hot-pixel rejection)"
+              aria-pressed={cleanStarlight}
+              className={`min-h-[48px] px-4 rounded-2xl flex items-center gap-2 text-xs font-medium transition-all active:scale-95 border focus-visible:outline-none focus-visible:ring-2 ${
                 cleanStarlight
                   ? (isCrimson 
-                      ? 'bg-red-900/40 border-red-600 text-red-300' 
-                      : 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300')
+                      ? 'bg-red-900/40 border-red-600 text-red-300 focus-visible:ring-red-500'
+                      : 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300 focus-visible:ring-emerald-400')
                   : (isCrimson 
-                      ? 'bg-red-950/20 border-red-900/30 text-red-500/60' 
-                      : 'bg-white/5 border-white/10 text-slate-400')
+                      ? 'bg-red-950/20 border-red-900/30 text-red-500/60 focus-visible:ring-red-500'
+                      : 'bg-white/5 border-white/10 text-slate-400 focus-visible:ring-emerald-400')
               }`}
               title="Clean Starlight (Sigma-Clipping satellite and hot-pixel rejection)"
             >
@@ -155,10 +161,11 @@ export default function Controls({
                   onResetStack();
                 }
               }}
-              className={`min-h-[48px] min-w-[48px] px-3 rounded-2xl flex items-center justify-center border transition-all active:scale-95 ${
+              aria-label="Reset master stack"
+              className={`min-h-[48px] min-w-[48px] px-3 rounded-2xl flex items-center justify-center border transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 ${
                 isCrimson 
-                  ? 'border-red-900/30 text-red-500/60 hover:text-red-400 hover:bg-red-950/30' 
-                  : 'border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  ? 'border-red-900/30 text-red-500/60 hover:text-red-400 hover:bg-red-950/30 focus-visible:ring-red-500'
+                  : 'border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5 focus-visible:ring-amber-400'
               }`}
               title="Reset Master Stack"
             >
@@ -171,14 +178,15 @@ export default function Controls({
             type="button"
             onClick={handleDownloadTiff}
             disabled={downloadingTiff || stackCount === 0}
-            className={`min-h-[48px] px-5 rounded-2xl flex items-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all active:scale-95 shadow-xl ${
+            aria-label="Download Master 16-bit TIFF"
+            className={`min-h-[48px] px-5 rounded-2xl flex items-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all active:scale-95 shadow-xl focus-visible:outline-none focus-visible:ring-2 ${
               stackCount === 0
-                ? 'opacity-40 cursor-not-allowed bg-slate-800 text-slate-500 border border-slate-700/50'
+                ? 'opacity-40 cursor-not-allowed bg-slate-800 text-slate-500 border border-slate-700/50 focus-visible:ring-slate-500'
                 : downloadSuccess
-                  ? 'bg-emerald-600 text-white'
+                  ? 'bg-emerald-600 text-white focus-visible:ring-emerald-400'
                   : isCrimson
-                    ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/30'
-                    : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/25'
+                    ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/30 focus-visible:ring-red-400'
+                    : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/25 focus-visible:ring-emerald-300'
             }`}
           >
             {downloadingTiff ? (
