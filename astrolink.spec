@@ -34,7 +34,7 @@ binaries += collect_dynamic_libs("rawpy")
 
 # 2. Collect package data files
 datas = []
-datas += collect_data_files("astropy")
+datas += collect_data_files("astropy.io.fits")
 datas += collect_data_files("scipy")
 datas += collect_data_files("cryptography")
 datas += collect_data_files("rawpy")
@@ -86,7 +86,6 @@ hiddenimports = [
     "scipy.optimize",
     "scipy.linalg",
     "rawpy",
-    "astropy",
     "astropy.io.fits",
     "tifffile",
     # Hardware & networking
@@ -124,7 +123,7 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=["hooks"],
     hooksconfig={},
     runtime_hooks=[],
     excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6"],
