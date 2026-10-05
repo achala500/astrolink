@@ -387,3 +387,50 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_prevention(client: TestClient) -> None:
+    """Verifies that path traversal attempts in feedback attachments are safely rejected."""
+    from backend.app.feedback import feedback_manager
+
+    traversal_paths = [
+        "..",
+        ".",
+        "../feedback.json",
+        "../../etc/passwd",
+        "/etc/passwd",
+        "nested/../../secret.txt",
+    ]
+
+    # Direct manager validation
+    for path_str in traversal_paths:
+        assert feedback_manager.get_attachment_path(path_str) is None
+
+    # HTTP API validation (testing URL-encoded traversal parameters)
+    http_traversal_paths = [
+        "..%2Ffeedback.json",
+        "..%2F..%2Fetc%2Fpasswd",
+        "%2Fetc%2Fpasswd",
+        "nested%2F..%2F..%2Fsecret.txt",
+    ]
+    for filename in http_traversal_paths:
+        resp = client.get(f"/api/feedback/attachment/{filename}")
+        assert resp.status_code == 404, f"Expected 404 for traversal path '{filename}', got {resp.status_code}"
+
+
+def test_feedback_attachment_valid_serving(client: TestClient) -> None:
+    """Verifies that valid feedback attachments within attachments_dir are served correctly."""
+    from backend.app.feedback import feedback_manager
+
+    # Create a legitimate test attachment in attachments_dir
+    test_filename = "test_ss_1.png"
+    target_path = feedback_manager.attachments_dir / test_filename
+    target_path.write_bytes(b"PNG_DUMMY_DATA")
+
+    try:
+        resp = client.get(f"/api/feedback/attachment/{test_filename}")
+        assert resp.status_code == 200
+        assert resp.content == b"PNG_DUMMY_DATA"
+    finally:
+        if target_path.exists():
+            target_path.unlink()
