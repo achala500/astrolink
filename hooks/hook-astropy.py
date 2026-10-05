@@ -1,7 +1,7 @@
 from PyInstaller.utils.hooks import collect_submodules
 
-# Filter out astropy.visualization as it requires matplotlib (which is excluded)
+# Collect astropy.io.fits submodules needed for FITS ingestion, excluding visualization/tests
 hiddenimports = collect_submodules(
-    "astropy",
-    filter=lambda name: not name.startswith("astropy.visualization"),
+    "astropy.io.fits",
+    filter=lambda name: "tests" not in name,
 )

@@ -86,7 +86,6 @@ hiddenimports = [
     "scipy.optimize",
     "scipy.linalg",
     "rawpy",
-    "astropy",
     "astropy.io.fits",
     "tifffile",
     # Hardware & networking
