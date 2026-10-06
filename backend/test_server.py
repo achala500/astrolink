@@ -35,6 +35,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from backend.app.feedback import feedback_manager
 from backend.app.hardware.intervalometer import CameraIntervalometer
 from backend.app.hardware.tether import CapturedFrame, GPhotoTetherDaemon
 from backend.app.main import app, intervalometer, session, ws_manager
@@ -387,3 +388,41 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_get_attachment_path_traversal_prevention(tmp_path: Path) -> None:
+    """Verifies that feedback_manager.get_attachment_path rejects path traversal attempts."""
+    from backend.app.feedback import FeedbackManager
+
+    fb_file = tmp_path / "feedback.json"
+    mgr = FeedbackManager(feedback_file=fb_file)
+
+    # Write a valid dummy attachment inside attachments_dir
+    valid_file = mgr.attachments_dir / "valid_screenshot.png"
+    valid_file.write_text("valid content")
+
+    # Write a sensitive dummy file outside attachments_dir
+    outside_file = tmp_path / "secret.txt"
+    outside_file.write_text("sensitive secret data")
+
+    # 1. Valid attachment retrieval
+    path = mgr.get_attachment_path("valid_screenshot.png")
+    assert path is not None
+    assert path.resolve() == valid_file.resolve()
+
+    # 2. Path traversal attempts
+    traversal_attempts = [
+        "../../secret.txt",
+        "..\\..\\secret.txt",
+        "../secret.txt",
+        "..\\secret.txt",
+        "/etc/passwd",
+        "C:\\Windows\\System32\\config\\SAM",
+        "\0valid_screenshot.png",
+        ".",
+        "..",
+        "",
+    ]
+
+    for attempt in traversal_attempts:
+        assert mgr.get_attachment_path(attempt) is None, f"Path traversal attempt not blocked: {attempt}"
