@@ -1,0 +1,4 @@
+## 2026-10-06 - PyInstaller Astropy Hook Matplotlib Conflict & Path Traversal Prevention
+**Vulnerability:** Path traversal in attachment path resolution when handling cross-platform backslash paths on POSIX systems, and PyInstaller build failures when astropy attempts submodule collection of matplotlib-dependent packages while matplotlib is excluded.
+**Learning:** `Path(filename).name` does not strip backslash separators on Linux systems, allowing `..\` sequences to bypass filename isolation. Additionally, PyInstaller's `collect_submodules('astropy')` triggers `astropy.visualization.wcsaxes` imports which invoke `pytest.importorskip("matplotlib")`, failing builds when matplotlib is intentionally excluded.
+**Prevention:** Always normalize path slashes (`replace('\\', '/')`) and verify strict containment with `.resolve()` and `.is_relative_to()`. Use custom PyInstaller hooks in `hooks/` to filter out submodules that depend on excluded libraries.
