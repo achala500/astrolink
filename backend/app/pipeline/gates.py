@@ -36,8 +36,10 @@ def _normalize_to_uint8(image: np.ndarray) -> np.ndarray:
         return image.copy()
 
     img = image.astype(np.float32)
-    min_val = float(np.percentile(img, 1))
-    max_val = float(np.percentile(img, 99.9))
+    # Bolt Optimization: Subsample array for fast percentile calculation
+    subsampled = img[::4, ::4] if img.size >= 10000 else img
+    min_val = float(np.percentile(subsampled, 1))
+    max_val = float(np.percentile(subsampled, 99.9))
 
     if max_val <= min_val:
         min_val, max_val = float(np.min(img)), float(np.max(img))

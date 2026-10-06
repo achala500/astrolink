@@ -35,8 +35,10 @@ def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
         return gray.copy()
 
     img = gray.astype(np.float32)
-    p_low = float(np.percentile(img, 1))
-    p_high = float(np.percentile(img, 99.8))
+    # Bolt Optimization: Subsample array for fast percentile calculation on high-res frames
+    subsampled = img[::4, ::4] if img.size >= 10000 else img
+    p_low = float(np.percentile(subsampled, 1))
+    p_high = float(np.percentile(subsampled, 99.8))
 
     if p_high <= p_low:
         p_low, p_high = float(np.min(img)), float(np.max(img))
@@ -94,8 +96,9 @@ def align_frame(
     new_u8 = _extract_gray_u8(new_frame)
 
     # Rejection Gate 1: Star count drop > 40% (clouds, thick fog, dew)
-    n_ref_stars = count_stars(ref_frame)
-    n_new_stars = count_stars(new_frame)
+    # Bolt Optimization: Pass pre-converted uint8 frames to count_stars to avoid redundant conversions
+    n_ref_stars = count_stars(ref_u8)
+    n_new_stars = count_stars(new_u8)
 
     if n_ref_stars > 0:
         star_drop = (n_ref_stars - n_new_stars) / float(n_ref_stars)
