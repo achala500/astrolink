@@ -129,7 +129,8 @@ export default function AuthModal({ isOpen, onClose, isCrimson }) {
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100 transition-all"
+              className="p-1.5 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100 transition-all focus-visible:ring-2 focus-visible:ring-emerald-400 outline-none"
+              aria-label="Close authentication modal"
             >
               <X className="w-4 h-4" />
             </button>
@@ -220,23 +221,31 @@ export default function AuthModal({ isOpen, onClose, isCrimson }) {
               {/* Email / Password Form */}
               <form onSubmit={handleEmailAuth} className="space-y-2.5">
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                  <label htmlFor="auth-email" className="sr-only">
+                    Astronomer Email
+                  </label>
+                  <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" aria-hidden="true" />
                   <input
+                    id="auth-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Astronomer Email"
-                    className="w-full h-10 pl-10 pr-3 rounded-xl text-xs bg-white/5 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-white/30 transition-all"
+                    className="w-full h-10 pl-10 pr-3 rounded-xl text-xs bg-white/5 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-white/30 focus-visible:ring-2 focus-visible:ring-emerald-400 transition-all"
                   />
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
+                  <label htmlFor="auth-password" className="sr-only">
+                    Password
+                  </label>
+                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" aria-hidden="true" />
                   <input
+                    id="auth-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
-                    className="w-full h-10 pl-10 pr-3 rounded-xl text-xs bg-white/5 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-white/30 transition-all"
+                    className="w-full h-10 pl-10 pr-3 rounded-xl text-xs bg-white/5 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-white/30 focus-visible:ring-2 focus-visible:ring-emerald-400 transition-all"
                   />
                 </div>
 
