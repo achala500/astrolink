@@ -387,3 +387,36 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_protection(tmp_path: Path) -> None:
+    """Verifies get_attachment_path rejects path traversal, parent escape, and symlink attempts."""
+    from backend.app.feedback import FeedbackManager
+
+    fb_file = tmp_path / "feedback.json"
+    mgr = FeedbackManager(feedback_file=fb_file)
+
+    # 1. Valid file creation in attachments dir
+    valid_file = mgr.attachments_dir / "valid_image.png"
+    valid_file.write_bytes(b"PNGDATA")
+
+    # Valid retrieval
+    assert mgr.get_attachment_path("valid_image.png") == valid_file.resolve()
+
+    # 2. File outside attachments dir
+    outside_file = tmp_path / "secret.txt"
+    outside_file.write_text("SENSITIVE")
+
+    # Path traversal attempts
+    assert mgr.get_attachment_path("../secret.txt") is None
+    assert mgr.get_attachment_path("..\\secret.txt") is None
+    assert mgr.get_attachment_path("/etc/passwd") is None
+
+    # 3. Symlink outside attachments dir
+    symlink_file = mgr.attachments_dir / "escaped_link.png"
+    try:
+        symlink_file.symlink_to(outside_file)
+        assert mgr.get_attachment_path("escaped_link.png") is None
+    except (OSError, NotImplementedError):
+        # Platform might not support symlinks without admin/root
+        pass
