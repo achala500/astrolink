@@ -39,8 +39,15 @@ def _compute_mtf_parameters(
     shadow_clip_k: float = -2.8,
 ) -> tuple[float, float, float]:
     """Computes robust shadow clipping point and midtone balance parameter m."""
-    med = float(np.median(channel))
-    mad = float(np.median(np.abs(channel - med)))
+    # Performance optimization: strided subsampling [::4, ::4] on large frames (>=512x512)
+    # reduces median/MAD sorting overhead from ~12M elements to ~750k elements (~15x speedup).
+    if channel.ndim >= 2 and channel.shape[0] >= 512 and channel.shape[1] >= 512:
+        sample = channel[::4, ::4]
+    else:
+        sample = channel
+
+    med = float(np.median(sample))
+    mad = float(np.median(np.abs(sample - med)))
     sigma = float(max(1e-6, 1.4826 * mad))
 
     # Shadow clipping point c0 (PixInsight default: median - 2.8 * sigma)
