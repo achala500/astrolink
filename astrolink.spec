@@ -32,9 +32,8 @@ binaries = []
 binaries += collect_dynamic_libs("cv2")
 binaries += collect_dynamic_libs("rawpy")
 
-# 2. Collect package data files
+# 2. Collect package data files (astropy datas handled by hooks/hook-astropy.py)
 datas = []
-datas += collect_data_files("astropy")
 datas += collect_data_files("scipy")
 datas += collect_data_files("cryptography")
 datas += collect_data_files("rawpy")
@@ -124,10 +123,10 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=["hooks"],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6"],
+    excludes=["tkinter", "matplotlib", "astropy.visualization", "PyQt5", "PyQt6", "PySide2", "PySide6"],
     noarchive=False,
     optimize=0,
 )
