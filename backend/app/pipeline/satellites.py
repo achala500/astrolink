@@ -16,8 +16,11 @@ def _to_uint8(image: np.ndarray) -> np.ndarray:
         return image.copy()
 
     img = image.astype(np.float32)
-    p_low = float(np.percentile(img, 1))
-    p_high = float(np.percentile(img, 99.8))
+    # Performance optimization: strided subsampling [::4, ::4] on large frames (>=512x512)
+    # speeds up global percentile calculations (~15x speedup).
+    sample = img[::4, ::4] if img.shape[0] >= 512 and img.shape[1] >= 512 else img
+    p_low = float(np.percentile(sample, 1))
+    p_high = float(np.percentile(sample, 99.8))
 
     if p_high <= p_low:
         p_low, p_high = float(np.min(img)), float(np.max(img))
