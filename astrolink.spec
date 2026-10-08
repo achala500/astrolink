@@ -32,9 +32,8 @@ binaries = []
 binaries += collect_dynamic_libs("cv2")
 binaries += collect_dynamic_libs("rawpy")
 
-# 2. Collect package data files
+# 2. Collect package data files (astropy datas handled by hooks/hook-astropy.py)
 datas = []
-datas += collect_data_files("astropy")
 datas += collect_data_files("scipy")
 datas += collect_data_files("cryptography")
 datas += collect_data_files("rawpy")
