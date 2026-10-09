@@ -14,9 +14,12 @@ from backend.app.licensing import (
 from backend.app.main import AstrophotographySession
 
 
+TEST_PRIVATE_KEY_HEX = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+
+
 def test_mint_and_verify_valid_license():
     """Valid Ed25519 license should verify completely offline with unlimited frames."""
-    key = mint_license("Hubble Observer", "lifetime")
+    key = mint_license("Hubble Observer", "lifetime", private_key_hex=TEST_PRIVATE_KEY_HEX)
     assert isinstance(key, str)
     assert len(key) > 50
 
@@ -30,7 +33,7 @@ def test_mint_and_verify_valid_license():
 
 def test_tampered_license_rejection():
     """Tampering with licensee or tier must fail cryptographic verification."""
-    valid_key = mint_license("Carl Sagan", "lifetime")
+    valid_key = mint_license("Carl Sagan", "lifetime", private_key_hex=TEST_PRIVATE_KEY_HEX)
     payload = json.loads(base64.b64decode(valid_key).decode("utf-8"))
 
     # Tamper with the licensee name
@@ -56,6 +59,12 @@ def test_malformed_key_handling():
     assert empty_status.max_frames == UNVERIFIED_FRAME_LIMIT
 
 
+def test_mint_without_private_key_raises_error():
+    """Calling mint_license without supplying a private key or env var must raise ValueError."""
+    with pytest.raises(ValueError, match="Private signing key required"):
+        mint_license("No Key User", "lifetime")
+
+
 def test_license_manager_activation_and_deactivation(tmp_path):
     """LicenseManager should handle activation, in-memory status, and deactivation."""
     key_file = tmp_path / "test_license.key"
@@ -66,7 +75,7 @@ def test_license_manager_activation_and_deactivation(tmp_path):
     assert mgr.get_max_frames() == 10
 
     # Activate valid key
-    valid_key = mint_license("Galileo Galilei", "field_pro")
+    valid_key = mint_license("Galileo Galilei", "field_pro", private_key_hex=TEST_PRIVATE_KEY_HEX)
     status = mgr.activate_license(valid_key, persist=True)
     assert status.is_valid is True
     assert mgr.is_licensed() is True
