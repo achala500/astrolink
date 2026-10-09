@@ -48,6 +48,7 @@ export default function Dock({
                 : 'hover:bg-white/10 border-transparent hover:border-white/10 text-slate-300'
             }`}
             title="Configure Exposure Sequence"
+            aria-label="Configure exposure sequence plan"
           >
             <Sliders className="w-4 h-4" />
             <span className="hidden md:inline">Plan</span>
@@ -70,6 +71,7 @@ export default function Dock({
                     : 'border-transparent hover:bg-white/5 text-slate-400')
             }`}
             title="Reveal Deep Sky (PixInsight MTF Stretch)"
+            aria-label="Reveal Deep Sky MTF stretch"
           >
             <Sparkles className="w-4 h-4" />
             <span className="hidden md:inline">Reveal Sky</span>
@@ -92,6 +94,7 @@ export default function Dock({
                     : 'border-transparent hover:bg-white/5 text-slate-400')
             }`}
             title="Clear City Glow (2nd Order Polynomial Removal)"
+            aria-label="Clear City Glow background removal"
           >
             <SunMedium className="w-4 h-4" />
             <span className="hidden md:inline">Clear Glow</span>
@@ -152,6 +155,7 @@ export default function Dock({
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
             }`}
             title="Reset Master Stack"
+            aria-label="Reset Master Stack"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -169,6 +173,7 @@ export default function Dock({
                 : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
             }`}
             title="Export 16-Bit TIFF Master"
+            aria-label="Export 16-Bit TIFF Master"
           >
             <Download className="w-4 h-4" />
             <span className="hidden md:inline">Export</span>
@@ -187,6 +192,7 @@ export default function Dock({
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
             }`}
             title="Toggle OLED Night Crimson Mode"
+            aria-label={isCrimson ? "Disable OLED Night Crimson Mode" : "Enable OLED Night Crimson Mode"}
           >
             {isCrimson ? (
               <Flame className="w-4 h-4 fill-current" />
