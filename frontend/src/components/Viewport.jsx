@@ -624,6 +624,7 @@ export default function Viewport({
               : 'bg-slate-950/70 border-white/10 text-slate-200 hover:border-white/30'
           }`}
           title="Fit & Center Screen"
+          aria-label="Fit and center screen"
         >
           <Maximize2 className="w-4 h-4" />
         </button>
@@ -642,6 +643,7 @@ export default function Viewport({
               : 'bg-slate-950/70 border-white/10 text-slate-200 hover:border-white/30'
           }`}
           title="Zoom In"
+          aria-label="Zoom in"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
@@ -660,6 +662,7 @@ export default function Viewport({
               : 'bg-slate-950/70 border-white/10 text-slate-200 hover:border-white/30'
           }`}
           title="Zoom Out"
+          aria-label="Zoom out"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
@@ -677,6 +680,7 @@ export default function Viewport({
               : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'
           }`}
           title="Upload RAW / FITS / TIFF Sub-Exposures"
+          aria-label="Upload RAW, FITS, or TIFF sub-exposures"
         >
           <UploadCloud className="w-4 h-4" />
         </button>
@@ -693,6 +697,7 @@ export default function Viewport({
                   : 'bg-slate-950/70 border-white/10 text-slate-200 hover:border-white/30')
           }`}
           title={isDeviceCamActive ? "Stop Device Camera" : "Use Phone / Device Camera Lens"}
+          aria-label={isDeviceCamActive ? "Stop device camera" : "Use phone or device camera lens"}
         >
           {isDeviceCamActive ? <Video className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
         </button>
@@ -722,6 +727,7 @@ export default function Viewport({
                 soundEngine.playClick();
               }}
               className="p-1 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100"
+              aria-label="Close star focus reticle"
             >
               <X className="w-3.5 h-3.5" />
             </button>
