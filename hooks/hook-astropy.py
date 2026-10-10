@@ -1,7 +1,16 @@
 from PyInstaller.utils.hooks import collect_submodules
 
-# Filter out astropy.visualization modules that require matplotlib when matplotlib is excluded
-hiddenimports = collect_submodules(
-    'astropy',
-    filter=lambda name: not name.startswith('astropy.visualization')
+excludedimports = [
+    'matplotlib',
+    'astropy.visualization',
+    'astropy.visualization.wcsaxes',
+]
+
+hiddenimports = (
+    collect_submodules('astropy.io')
+    + collect_submodules('astropy.config')
+    + collect_submodules('astropy.utils')
+    + collect_submodules('astropy.units')
+    + collect_submodules('astropy.nddata')
+    + collect_submodules('astropy.table')
 )
