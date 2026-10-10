@@ -32,14 +32,17 @@ def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
         gray = image
 
     if gray.dtype == np.uint8:
-        return gray.copy()
+        return gray if gray.ndim == 2 else gray.squeeze()
 
-    img = gray.astype(np.float32)
-    p_low = float(np.percentile(img, 1))
-    p_high = float(np.percentile(img, 99.8))
+    img = gray.astype(np.float32, copy=False)
+    h, w = img.shape[:2]
+    # Strided subsampling for global percentile estimation on large images (>=512x512)
+    sample = img[::4, ::4] if max(h, w) >= 512 else img
+    p_low = float(np.percentile(sample, 1))
+    p_high = float(np.percentile(sample, 99.8))
 
     if p_high <= p_low:
-        p_low, p_high = float(np.min(img)), float(np.max(img))
+        p_low, p_high = float(np.min(sample)), float(np.max(sample))
 
     if p_high > p_low:
         scaled = np.clip((img - p_low) / (p_high - p_low) * 255.0, 0.0, 255.0)
@@ -51,8 +54,11 @@ def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
 def count_stars(image: np.ndarray) -> int:
     """Estimates detectable star count via background thresholding and contour analysis."""
     u8 = _extract_gray_u8(image)
-    med = float(np.median(u8))
-    mad = float(np.median(np.abs(u8 - med)))
+    h, w = u8.shape[:2]
+    # Strided subsampling for background statistics on large images (>=512x512)
+    sample = u8[::4, ::4] if max(h, w) >= 512 else u8
+    med = float(np.median(sample))
+    mad = float(np.median(np.abs(sample - med)))
     thresh_val = int(min(254, max(10, med + 3.0 * max(1.0, 1.4826 * mad))))
     _, binary = cv2.threshold(u8, thresh_val, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -94,8 +100,9 @@ def align_frame(
     new_u8 = _extract_gray_u8(new_frame)
 
     # Rejection Gate 1: Star count drop > 40% (clouds, thick fog, dew)
-    n_ref_stars = count_stars(ref_frame)
-    n_new_stars = count_stars(new_frame)
+    # Pass pre-extracted ref_u8 and new_u8 to avoid redundant gray extraction and percentile computation
+    n_ref_stars = count_stars(ref_u8)
+    n_new_stars = count_stars(new_u8)
 
     if n_ref_stars > 0:
         star_drop = (n_ref_stars - n_new_stars) / float(n_ref_stars)
