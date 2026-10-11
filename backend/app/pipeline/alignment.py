@@ -20,7 +20,11 @@ class FrameRejectedError(ValueError):
 
 
 def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
-    """Extracts a normalized 8-bit single-channel image for feature tracking."""
+    """Extracts a normalized 8-bit single-channel image for feature tracking.
+
+    Optimized using strided subsampling [::4, ::4] for global noise percentiles
+    on large images (>=512x512).
+    """
     if image.ndim == 3:
         if image.shape[2] == 3:
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY if image.dtype == np.uint8 else cv2.COLOR_RGB2GRAY)
@@ -32,14 +36,17 @@ def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
         gray = image
 
     if gray.dtype == np.uint8:
-        return gray.copy()
+        return gray if gray.flags.c_contiguous else gray.copy()
 
     img = gray.astype(np.float32)
-    p_low = float(np.percentile(img, 1))
-    p_high = float(np.percentile(img, 99.8))
+
+    # Strided subsampling for >=512x512 images accelerates percentile estimation ~16x
+    sample = img[::4, ::4] if img.shape[0] >= 512 and img.shape[1] >= 512 else img
+    p_low = float(np.percentile(sample, 1))
+    p_high = float(np.percentile(sample, 99.8))
 
     if p_high <= p_low:
-        p_low, p_high = float(np.min(img)), float(np.max(img))
+        p_low, p_high = float(np.min(sample)), float(np.max(sample))
 
     if p_high > p_low:
         scaled = np.clip((img - p_low) / (p_high - p_low) * 255.0, 0.0, 255.0)
@@ -49,10 +56,21 @@ def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
 
 
 def count_stars(image: np.ndarray) -> int:
-    """Estimates detectable star count via background thresholding and contour analysis."""
-    u8 = _extract_gray_u8(image)
-    med = float(np.median(u8))
-    mad = float(np.median(np.abs(u8 - med)))
+    """Estimates detectable star count via background thresholding and contour analysis.
+
+    Accepts both original frames and pre-extracted uint8 grayscale arrays.
+    Uses strided subsampling [::4, ::4] for background statistics on large images.
+    """
+    if image.dtype == np.uint8 and image.ndim == 2:
+        u8 = image
+    else:
+        u8 = _extract_gray_u8(image)
+
+    # Strided subsampling for global background median/MAD on large images
+    sample = u8[::4, ::4] if u8.shape[0] >= 512 and u8.shape[1] >= 512 else u8
+    med = float(np.median(sample))
+    mad = float(np.median(np.abs(sample.astype(np.float32) - med)))
+
     thresh_val = int(min(254, max(10, med + 3.0 * max(1.0, 1.4826 * mad))))
     _, binary = cv2.threshold(u8, thresh_val, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -93,9 +111,10 @@ def align_frame(
     ref_u8 = _extract_gray_u8(ref_frame)
     new_u8 = _extract_gray_u8(new_frame)
 
-    # Rejection Gate 1: Star count drop > 40% (clouds, thick fog, dew)
-    n_ref_stars = count_stars(ref_frame)
-    n_new_stars = count_stars(new_frame)
+    # Rejection Gate 1: Star count drop > 40% (clouds, thick fog, dew).
+    # Pass pre-converted ref_u8 and new_u8 to avoid redundant gray extraction.
+    n_ref_stars = count_stars(ref_u8)
+    n_new_stars = count_stars(new_u8)
 
     if n_ref_stars > 0:
         star_drop = (n_ref_stars - n_new_stars) / float(n_ref_stars)
