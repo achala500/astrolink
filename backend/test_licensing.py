@@ -2,8 +2,19 @@
 
 import base64
 import json
+import os
 import numpy as np
 import pytest
+
+# Test private key matching MASTER_PUBLIC_KEY_HEX
+TEST_PRIVATE_KEY_HEX = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+
+
+@pytest.fixture(autouse=True)
+def setup_test_key_env(monkeypatch):
+    """Sets ASTROLINK_MASTER_PRIVATE_KEY for test runs."""
+    monkeypatch.setenv("ASTROLINK_MASTER_PRIVATE_KEY", TEST_PRIVATE_KEY_HEX)
+
 
 from backend.app.licensing import (
     LicenseManager,
