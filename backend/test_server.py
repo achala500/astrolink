@@ -387,3 +387,25 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_get_attachment_path_traversal_prevention(client: TestClient) -> None:
+    """Verifies path traversal attempts on feedback attachments return 404 / None."""
+    from backend.app.feedback import feedback_manager
+
+    # 1. Direct FeedbackManager method checks
+    assert feedback_manager.get_attachment_path("..") is None
+    assert feedback_manager.get_attachment_path(".") is None
+    assert feedback_manager.get_attachment_path("../feedback.json") is None
+    assert feedback_manager.get_attachment_path("/etc/passwd") is None
+    assert feedback_manager.get_attachment_path("..\\..\\windows\\system32") is None
+
+    # 2. HTTP endpoint path traversal checks
+    traversal_paths = [
+        "feedback.json",
+        "sub/feedback.json",
+        "nonexistent.png",
+    ]
+    for filename in traversal_paths:
+        resp = client.get(f"/api/feedback/attachment/{filename}")
+        assert resp.status_code == 404
