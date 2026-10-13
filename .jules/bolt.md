@@ -1,0 +1,4 @@
+## 2026-03-30 - 1D Coordinate Broadcasting for 2D Polynomial Surface Evaluation
+**Learning:** Constructing 2D meshgrids (`np.mgrid`) and full 2D feature matrices (`(h*w, num_terms)`) to evaluate a 2D polynomial background gradient on high-resolution astronomical images (e.g., 3000x3000 or 4000x4000) causes massive memory allocations (>1 GB temporary float64 arrays per channel) and slow matrix multiplication (~11s per frame).
+Evaluating the polynomial surface $P(x, y) = \sum c_{i, j} x^i y^j$ using 1D broadcasting (`x_1d` shape `(1, w)` and `y_1d` shape `(h, 1)`) achieves the exact same numerical result with ~30x faster runtime (~0.38s) and >93% memory savings (~72 MB allocation).
+**Action:** Always prefer 1D vector broadcasting over full 2D meshgrids and feature matrices when evaluating separable 2D coordinate functions across image dimensions.
