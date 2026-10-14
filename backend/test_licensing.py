@@ -13,6 +13,15 @@ from backend.app.licensing import (
 )
 from backend.app.main import AstrophotographySession
 
+# Test-only private key corresponding to MASTER_PUBLIC_KEY_HEX for test key minting
+TEST_PRIVATE_KEY_HEX = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+
+
+@pytest.fixture(autouse=True)
+def setup_test_license_env(monkeypatch):
+    """Provide test private key via environment variable for all licensing tests."""
+    monkeypatch.setenv("ASTROLINK_MASTER_PRIVATE_KEY", TEST_PRIVATE_KEY_HEX)
+
 
 def test_mint_and_verify_valid_license():
     """Valid Ed25519 license should verify completely offline with unlimited frames."""
@@ -42,6 +51,14 @@ def test_tampered_license_rejection():
     assert status.is_valid is False
     assert status.max_frames == UNVERIFIED_FRAME_LIMIT
     assert "Cryptographic signature mismatch" in (status.error or "")
+
+
+def test_mint_without_private_key_raises_error(monkeypatch):
+    """Minting without configured private key or env var must raise ValueError."""
+    monkeypatch.delenv("ASTROLINK_MASTER_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("ASTROLINK_PRIVATE_KEY", raising=False)
+    with pytest.raises(ValueError, match="Master private key not configured"):
+        mint_license("Galileo")
 
 
 def test_malformed_key_handling():
