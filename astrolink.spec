@@ -34,7 +34,8 @@ binaries += collect_dynamic_libs("rawpy")
 
 # 2. Collect package data files
 datas = []
-datas += collect_data_files("astropy")
+astropy_datas = collect_data_files("astropy", excludes=["astropy.visualization", "astropy.visualization.wcsaxes"])
+datas += [d for d in astropy_datas if "visualization" not in str(d[0]) and "visualization" not in str(d[1])]
 datas += collect_data_files("scipy")
 datas += collect_data_files("cryptography")
 datas += collect_data_files("rawpy")
@@ -124,10 +125,10 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=["hooks"],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6"],
+    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6", "astropy.visualization"],
     noarchive=False,
     optimize=0,
 )
