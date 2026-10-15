@@ -34,11 +34,14 @@ binaries += collect_dynamic_libs("rawpy")
 
 # 2. Collect package data files
 datas = []
-datas += collect_data_files("astropy")
+datas += collect_data_files("astropy", excludes=["*.visualization*", "astropy/visualization/*", "astropy/visualization/**"])
 datas += collect_data_files("scipy")
 datas += collect_data_files("cryptography")
 datas += collect_data_files("rawpy")
 datas += collect_data_files("cv2")
+
+# Explicitly filter out any astropy.visualization data files that require matplotlib
+datas = [(src, dest) for (src, dest) in datas if "visualization" not in src and "visualization" not in dest]
 
 # 3. Bundle compiled React frontend into sys._MEIPASS
 frontend_dist_source = os.path.join(SPECPATH, "frontend", "dist")
@@ -127,7 +130,7 @@ a = Analysis(
     hookspath=["hooks"],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6"],
+    excludes=["tkinter", "matplotlib", "astropy.visualization", "PyQt5", "PyQt6", "PySide2", "PySide6"],
     noarchive=False,
     optimize=0,
 )
