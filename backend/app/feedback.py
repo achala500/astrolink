@@ -121,10 +121,15 @@ class FeedbackManager:
 
     def get_attachment_path(self, filename: str) -> Optional[Path]:
         """Resolves an attachment path safely preventing path traversal."""
-        safe_name = Path(filename).name
-        target = self.attachments_dir / safe_name
-        if target.exists() and target.is_file():
-            return target
+        try:
+            base_dir = self.attachments_dir.resolve()
+            target = (self.attachments_dir / filename).resolve()
+            # Security: Ensure target path remains strictly within attachments_dir
+            if target.is_relative_to(base_dir) and target != base_dir:
+                if target.exists() and target.is_file():
+                    return target
+        except (ValueError, OSError):
+            pass
         return None
 
     def get_all(self, include_resolved: bool = False) -> List[dict]:

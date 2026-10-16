@@ -387,3 +387,19 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_path_traversal_prevention_on_feedback_attachment(client: TestClient) -> None:
+    """Verifies path traversal attempts on feedback attachment endpoint return 404."""
+    from backend.app.feedback import feedback_manager
+
+    # Valid attachment request
+    res_none = feedback_manager.get_attachment_path("../../../etc/passwd")
+    assert res_none is None, "Path traversal attempt should return None"
+
+    res_none_sub = feedback_manager.get_attachment_path("..\\..\\windows\\system32")
+    assert res_none_sub is None, "Windows path traversal attempt should return None"
+
+    # API request
+    resp = client.get("/api/feedback/attachment/..%2F..%2Fetc%2Fpasswd")
+    assert resp.status_code == 404
