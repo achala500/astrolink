@@ -1,0 +1,3 @@
+## 2025-05-18 - Floating Action Dock Accessibility in Astro Night Mode UIs
+**Learning:** Responsive icon-only buttons in floating bottom docks (like Dock.jsx) hide labels on smaller breakpoints (`hidden md:inline`). Without explicit `aria-label` and `aria-pressed` states, screen reader users miss context when toggling filters or night modes. Additionally, default focus outlines can be visually invisible against dark or crimson background gradients without explicit `focus-visible:ring-2` indicators tailored to theme colors.
+**Action:** Always provide `aria-label`, `aria-pressed`, `aria-hidden="true"` on decorative icons, and high-contrast `focus-visible` ring styles on compact action controls.
