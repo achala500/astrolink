@@ -387,3 +387,32 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_prevention() -> None:
+    """Verifies that get_attachment_path prevents path traversal and symlink escapes."""
+    from backend.app.feedback import FeedbackManager, feedback_manager
+
+    # Test invalid filenames / path traversal attempts
+    assert feedback_manager.get_attachment_path("..") is None
+    assert feedback_manager.get_attachment_path(".") is None
+    assert feedback_manager.get_attachment_path("../../../etc/passwd") is None
+    assert feedback_manager.get_attachment_path("..\\..\\windows\\system32") is None
+
+    # Test valid attachment resolution
+    test_filename = "test_sample_attachment.png"
+    sample_path = feedback_manager.attachments_dir / test_filename
+    sample_path.write_bytes(b"dummy image data")
+
+    try:
+        resolved = feedback_manager.get_attachment_path(test_filename)
+        assert resolved is not None
+        assert resolved.resolve() == sample_path.resolve()
+
+        # Path traversal with filename parameter that resolves to target inside directory
+        resolved_traversal = feedback_manager.get_attachment_path(f"folder/../{test_filename}")
+        assert resolved_traversal is not None
+        assert resolved_traversal.resolve() == sample_path.resolve()
+    finally:
+        if sample_path.exists():
+            sample_path.unlink()
