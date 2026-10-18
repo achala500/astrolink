@@ -6,5 +6,6 @@ which attempts to import matplotlib via pytest.importorskip("matplotlib").
 
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
+excludedimports = ["astropy.visualization", "astropy.visualization.wcsaxes"]
 hiddenimports = collect_submodules("astropy", filter=lambda name: "astropy.visualization" not in name)
-datas = collect_data_files("astropy")
+datas = collect_data_files("astropy", excludes=["astropy.visualization*"])
