@@ -151,13 +151,22 @@ fi
                     lines = ipc_file.read_text(encoding="utf-8").splitlines()
                     # Truncate after reading
                     ipc_file.write_text("", encoding="utf-8")
+                    resolved_watch = self.watch_dir.resolve()
                     for line in lines:
-                        target_path = Path(line.strip())
+                        line_str = line.strip()
+                        if not line_str:
+                            continue
+                        target_path = Path(line_str)
                         if not target_path.is_absolute():
                             target_path = self.watch_dir / target_path
-                        if target_path.exists() and target_path not in seen_files:
-                            self._ingest_file(target_path)
-                            seen_files.add(target_path)
+                        resolved_target = target_path.resolve()
+                        # Path Traversal Prevention: Ensure target remains strictly within watch_dir
+                        if not resolved_target.is_relative_to(resolved_watch):
+                            logger.warning("Security alert: Rejected tether frame path outside watch directory: %s", line)
+                            continue
+                        if resolved_target.is_file() and resolved_target not in seen_files:
+                            self._ingest_file(resolved_target)
+                            seen_files.add(resolved_target)
                 except Exception as e:
                     logger.debug("Error processing hook IPC log: %s", e)
 

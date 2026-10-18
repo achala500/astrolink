@@ -387,3 +387,31 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_path_traversal_prevention(client: TestClient) -> None:
+    """Verifies path traversal attempts in feedback attachment endpoint and tether daemon are blocked."""
+    from backend.app.feedback import feedback_manager
+
+    # 1. Feedback attachment path traversal test
+    resp = client.get("/api/feedback/attachment/..%2F..%2Fetc%2Fpasswd")
+    assert resp.status_code in (404, 422, 400)
+
+    # Directly check get_attachment_path for traversal attempts
+    assert feedback_manager.get_attachment_path("../../etc/passwd") is None
+    assert feedback_manager.get_attachment_path("/etc/passwd") is None
+
+    # 2. Tether daemon path traversal test via .gphoto_events.txt
+    received: List[CapturedFrame] = []
+    daemon = GPhotoTetherDaemon(on_frame_callback=lambda f: received.append(f), simulate=True)
+
+    # Write an external path to .gphoto_events.txt
+    ipc_file = daemon.watch_dir / ".gphoto_events.txt"
+    ipc_file.write_text("/etc/passwd\n", encoding="utf-8")
+
+    daemon.start()
+    time.sleep(0.3)
+    daemon.stop()
+
+    # The external path /etc/passwd should NOT be ingested
+    assert len(received) == 0
