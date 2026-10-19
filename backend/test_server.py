@@ -387,3 +387,37 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_protection(tmp_path: Path) -> None:
+    """Verifies FeedbackManager.get_attachment_path rejects path traversal attempts."""
+    from backend.app.feedback import FeedbackManager
+
+    dummy_feedback_file = tmp_path / "feedback.json"
+    fm = FeedbackManager(feedback_file=dummy_feedback_file)
+
+    # Create a valid attachment
+    valid_file = fm.attachments_dir / "valid_sample.png"
+    valid_file.write_bytes(b"PNG_DATA")
+
+    # Create a sensitive file outside attachments_dir (in feedback directory)
+    outside_file = tmp_path / "secret.txt"
+    outside_file.write_bytes(b"SECRET_KEY")
+
+    # 1. Valid attachment should resolve successfully
+    res_valid = fm.get_attachment_path("valid_sample.png")
+    assert res_valid is not None
+    assert res_valid.resolve() == valid_file.resolve()
+
+    # 2. Path traversal attempts should be rejected and return None
+    traversal_attempts = [
+        "../secret.txt",
+        "../../secret.txt",
+        "..%2fsecret.txt",
+        str(outside_file),
+        "/etc/passwd",
+        "non_existent.png",
+    ]
+
+    for attempt in traversal_attempts:
+        assert fm.get_attachment_path(attempt) is None, f"Expected None for traversal attempt: {attempt}"
