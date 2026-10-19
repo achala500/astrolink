@@ -144,6 +144,7 @@ export default function ExportSheet({
           </div>
           <button
             type="button"
+            aria-label="Close export sheet"
             onClick={onClose}
             className="p-2 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100 transition-colors"
           >

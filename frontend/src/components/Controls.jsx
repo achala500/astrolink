@@ -149,6 +149,7 @@ export default function Controls({
           {onResetStack && (
             <button
               type="button"
+              aria-label="Reset Master Stack"
               onClick={() => {
                 if (window.confirm('Reset the active stacking session?')) {
                   soundEngine.playClick();
