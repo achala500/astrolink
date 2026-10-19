@@ -190,6 +190,7 @@ export default function DynamicIsland({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
+                  aria-label={audioEnabled ? "Mute Tactile Audio" : "Enable Tactile Audio"}
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleAudio();

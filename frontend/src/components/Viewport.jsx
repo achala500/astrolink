@@ -614,6 +614,7 @@ export default function Viewport({
         {/* Recenter & Fit to Screen */}
         <button
           type="button"
+          aria-label="Fit & Center Screen"
           onClick={() => {
             soundEngine.playClick();
             fitToScreen();
@@ -631,6 +632,7 @@ export default function Viewport({
         {/* Zoom In */}
         <button
           type="button"
+          aria-label="Zoom In"
           onClick={() => {
             const newScale = Math.min(transform.scale * 1.4, 25);
             setTransform(prev => ({ ...prev, scale: newScale }));
@@ -649,6 +651,7 @@ export default function Viewport({
         {/* Zoom Out */}
         <button
           type="button"
+          aria-label="Zoom Out"
           onClick={() => {
             const newScale = Math.max(transform.scale * 0.7, 0.1);
             setTransform(prev => ({ ...prev, scale: newScale }));
@@ -667,6 +670,7 @@ export default function Viewport({
         {/* Upload Real Astrophotography Files Button */}
         <button
           type="button"
+          aria-label="Upload RAW / FITS / TIFF Sub-Exposures"
           onClick={() => {
             soundEngine.playClick();
             fileInputRef.current?.click();
@@ -684,6 +688,7 @@ export default function Viewport({
         {/* In-Browser Phone / Device Camera Live Stream */}
         <button
           type="button"
+          aria-label={isDeviceCamActive ? "Stop Device Camera" : "Use Phone / Device Camera Lens"}
           onClick={toggleDeviceCamera}
           className={`p-3 rounded-full border backdrop-blur-xl transition-all duration-200 active:scale-90 ${
             isDeviceCamActive
@@ -716,6 +721,7 @@ export default function Viewport({
             </div>
             <button
               type="button"
+              aria-label="Close star focus reticle"
               onClick={() => {
                 setShowLoupe(false);
                 setTargetPoint(null);

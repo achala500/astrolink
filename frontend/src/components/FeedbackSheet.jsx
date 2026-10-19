@@ -277,6 +277,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
       {/* Floating Action Button */}
       <button
         type="button"
+        aria-label="Report issue or suggest improvement"
         onClick={() => {
           soundEngine.playClick();
           setIsOpen(true);
@@ -315,6 +316,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
               </div>
               <button
                 type="button"
+                aria-label="Close feedback modal"
                 onClick={() => {
                   soundEngine.playClick();
                   setIsOpen(false);
@@ -478,6 +480,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
                             <span className="text-[9px] truncate text-white">{att.name}</span>
                             <button
                               type="button"
+                              aria-label={`Remove attachment ${att.name}`}
                               onClick={() => removeAttachment(att.id)}
                               className="p-1 rounded-full bg-red-600 text-white hover:bg-red-500"
                             >
@@ -611,6 +614,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
             <img src={previewImage} alt="Expanded Screenshot" className="max-w-full max-h-[85vh] object-contain" />
             <button
               type="button"
+              aria-label="Close screenshot preview"
               onClick={() => setPreviewImage(null)}
               className="absolute top-3 right-3 p-2 rounded-full bg-black/70 text-white hover:bg-black"
             >

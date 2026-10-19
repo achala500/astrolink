@@ -140,6 +140,7 @@ export default function Dock({
           {/* Reset Stack */}
           <button
             type="button"
+            aria-label="Reset Master Stack"
             onClick={() => {
               if (window.confirm('Reset current stack and start fresh session?')) {
                 soundEngine.playClick();
@@ -177,6 +178,7 @@ export default function Dock({
           {/* OLED Astro Red Mode Toggle */}
           <button
             type="button"
+            aria-label={isCrimson ? "Disable OLED Night Crimson Mode" : "Enable OLED Night Crimson Mode"}
             onClick={() => {
               soundEngine.playClick();
               onToggleCrimson();
