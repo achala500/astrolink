@@ -38,6 +38,7 @@ export default function Dock({
           {/* Settings Configurator (48px hit target) */}
           <button
             type="button"
+            aria-label="Configure Exposure Sequence Plan"
             onClick={() => {
               soundEngine.playClick();
               onOpenSettings();
@@ -56,6 +57,7 @@ export default function Dock({
           {/* Reveal Deep Sky (MTF Auto-Stretch Toggle) */}
           <button
             type="button"
+            aria-label={revealDeepSky ? "Disable Reveal Deep Sky MTF stretch" : "Enable Reveal Deep Sky MTF stretch"}
             onClick={() => {
               soundEngine.playClick();
               onToggleRevealDeepSky();
@@ -78,6 +80,7 @@ export default function Dock({
           {/* Clear City Glow (Background Gradient Removal Toggle) */}
           <button
             type="button"
+            aria-label={clearCityGlow ? "Disable Clear City Glow gradient removal" : "Enable Clear City Glow gradient removal"}
             onClick={() => {
               soundEngine.playClick();
               onToggleClearCityGlow();
@@ -103,6 +106,7 @@ export default function Dock({
           {isRunning ? (
             <button
               type="button"
+              aria-label="Pause exposure sequence run"
               onClick={() => {
                 soundEngine.playClick();
                 onStopSequence();
@@ -119,6 +123,7 @@ export default function Dock({
           ) : (
             <button
               type="button"
+              aria-label="Start exposure sequence shooting"
               onClick={() => {
                 soundEngine.playClick();
                 onStartSequence();
@@ -140,6 +145,7 @@ export default function Dock({
           {/* Reset Stack */}
           <button
             type="button"
+            aria-label="Reset Master Stack"
             onClick={() => {
               if (window.confirm('Reset current stack and start fresh session?')) {
                 soundEngine.playClick();
@@ -159,6 +165,7 @@ export default function Dock({
           {/* Master 16-Bit TIFF Export */}
           <button
             type="button"
+            aria-label="Export 16-Bit TIFF Master output"
             onClick={() => {
               soundEngine.playClick();
               onOpenExport();
@@ -177,6 +184,7 @@ export default function Dock({
           {/* OLED Astro Red Mode Toggle */}
           <button
             type="button"
+            aria-label={isCrimson ? "Disable OLED Night Crimson Mode" : "Enable OLED Night Crimson Mode"}
             onClick={() => {
               soundEngine.playClick();
               onToggleCrimson();
