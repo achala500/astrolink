@@ -1,8 +1,15 @@
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-# Filter out astropy.visualization to prevent matplotlib import errors when matplotlib is excluded
+excludedimports = [
+    "matplotlib",
+    "matplotlib.pyplot",
+    "astropy.visualization",
+    "astropy.visualization.wcsaxes",
+]
+
 hiddenimports = collect_submodules(
     "astropy",
     filter=lambda name: not name.startswith("astropy.visualization"),
 )
-datas = collect_data_files("astropy")
+
+datas = collect_data_files("astropy", excludes=["**/visualization/**", "visualization/**"])
