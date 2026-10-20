@@ -387,3 +387,25 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal(client: TestClient) -> None:
+    """Verifies that path traversal attacks on /api/feedback/attachment/{filename} are blocked."""
+    from backend.app.feedback import feedback_manager
+
+    # Test path traversal payloads
+    traversal_filenames = [
+        "../../etc/passwd",
+        "..\\..\\Windows\\System32\\cmd.exe",
+        "../../../requirements.txt",
+        "nonexistent_image.png",
+    ]
+
+    for fn in traversal_filenames:
+        resp = client.get(f"/api/feedback/attachment/{fn}")
+        assert resp.status_code == 404, f"Expected 404 for traversal attempt '{fn}', got {resp.status_code}"
+
+    # Verify get_attachment_path explicitly returns None for traversal targets
+    for fn in traversal_filenames:
+        path = feedback_manager.get_attachment_path(fn)
+        assert path is None, f"get_attachment_path returned a path for traversal attempt '{fn}': {path}"
