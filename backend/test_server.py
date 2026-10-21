@@ -387,3 +387,17 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_protection(client: TestClient) -> None:
+    """Verifies feedback attachment endpoint rejects path traversal payloads and non-existent files."""
+    from backend.app.feedback import feedback_manager
+
+    # 1. Direct path traversal attempt via feedback_manager
+    assert feedback_manager.get_attachment_path("../../../etc/passwd") is None
+    assert feedback_manager.get_attachment_path("..%2f..%2fetc%2fpasswd") is None
+    assert feedback_manager.get_attachment_path("non_existent_file.png") is None
+
+    # 2. HTTP endpoint path traversal request
+    resp = client.get("/api/feedback/attachment/..%2f..%2fetc%2fpasswd")
+    assert resp.status_code == 404
