@@ -34,7 +34,10 @@ binaries += collect_dynamic_libs("rawpy")
 
 # 2. Collect package data files
 datas = []
-datas += collect_data_files("astropy")
+try:
+    datas += collect_data_files("astropy", excludes=["astropy/visualization/*"])
+except Exception as e:
+    print(f"[PyInstaller Spec] Warning collecting astropy datas: {e}")
 datas += collect_data_files("scipy")
 datas += collect_data_files("cryptography")
 datas += collect_data_files("rawpy")
@@ -127,7 +130,7 @@ a = Analysis(
     hookspath=["hooks"],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6"],
+    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6", "astropy.visualization"],
     noarchive=False,
     optimize=0,
 )
