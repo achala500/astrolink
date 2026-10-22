@@ -66,6 +66,7 @@ export default function CameraModal({ isOpen, onClose, isCrimson, backendUrl }) 
               soundEngine.playClick();
               onClose();
             }}
+            aria-label="Close camera hub modal"
             className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
           >
             <X className="w-5 h-5" />

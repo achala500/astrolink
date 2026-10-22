@@ -129,6 +129,7 @@ export default function AuthModal({ isOpen, onClose, isCrimson }) {
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close authentication modal"
               className="p-1.5 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100 transition-all"
             >
               <X className="w-4 h-4" />
@@ -226,6 +227,7 @@ export default function AuthModal({ isOpen, onClose, isCrimson }) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Astronomer Email"
+                    aria-label="Astronomer Email"
                     className="w-full h-10 pl-10 pr-3 rounded-xl text-xs bg-white/5 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-white/30 transition-all"
                   />
                 </div>
@@ -236,6 +238,7 @@ export default function AuthModal({ isOpen, onClose, isCrimson }) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
+                    aria-label="Password"
                     className="w-full h-10 pl-10 pr-3 rounded-xl text-xs bg-white/5 border border-white/10 text-white placeholder-slate-500 outline-none focus:border-white/30 transition-all"
                   />
                 </div>

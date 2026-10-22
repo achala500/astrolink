@@ -96,6 +96,7 @@ export default function SessionSheet({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close capture configurator sheet"
             className="p-2 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -276,6 +277,7 @@ export default function SessionSheet({
             max="300"
             value={frameCount}
             onChange={(e) => setFrameCount(Number(e.target.value))}
+            aria-label="Total stack frames"
             className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
               isCrimson ? 'accent-red-600 bg-red-950/40' : 'accent-emerald-500 bg-slate-800'
             }`}
@@ -302,6 +304,7 @@ export default function SessionSheet({
             step="0.5"
             value={delaySeconds}
             onChange={(e) => setDelaySeconds(Number(e.target.value))}
+            aria-label="Sensor cooldown delay"
             className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
               isCrimson ? 'accent-red-600 bg-red-950/40' : 'accent-emerald-500 bg-slate-800'
             }`}
