@@ -13,6 +13,22 @@ from backend.app.licensing import (
 )
 from backend.app.main import AstrophotographySession
 
+TEST_PRIVATE_KEY_HEX = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+
+
+@pytest.fixture(autouse=True)
+def setup_test_master_key(monkeypatch):
+    """Sets test Ed25519 private key in environment variable for licensing test suite."""
+    monkeypatch.setenv("ASTROLINK_MASTER_PRIVATE_KEY", TEST_PRIVATE_KEY_HEX)
+
+
+def test_mint_license_missing_key_raises_error(monkeypatch):
+    """Calling mint_license without private key in env or args must raise ValueError."""
+    monkeypatch.delenv("ASTROLINK_MASTER_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("ASTROLINK_PRIVATE_KEY", raising=False)
+    with pytest.raises(ValueError, match="Private key required for minting license keys"):
+        mint_license("Astronomer", "lifetime")
+
 
 def test_mint_and_verify_valid_license():
     """Valid Ed25519 license should verify completely offline with unlimited frames."""
