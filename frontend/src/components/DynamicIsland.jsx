@@ -194,6 +194,7 @@ export default function DynamicIsland({
                     e.stopPropagation();
                     onToggleAudio();
                   }}
+                  aria-label="Toggle tactile audio"
                   className="p-1 rounded-full hover:bg-white/10 transition-colors"
                   title="Toggle Tactile Audio"
                 >

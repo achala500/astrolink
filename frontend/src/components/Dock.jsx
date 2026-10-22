@@ -146,6 +146,7 @@ export default function Dock({
                 onResetStack();
               }
             }}
+            aria-label="Reset master stack"
             className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
               isCrimson 
                 ? 'border-transparent hover:bg-red-950/40 text-red-500/70 hover:text-red-400' 
@@ -181,6 +182,7 @@ export default function Dock({
               soundEngine.playClick();
               onToggleCrimson();
             }}
+            aria-label="Toggle OLED night crimson mode"
             className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
               isCrimson 
                 ? 'bg-red-600 text-black border-red-500' 
