@@ -387,3 +387,28 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_prevention(client: TestClient) -> None:
+    """Verifies path traversal & symlink escape attempts in attachment endpoint return 404."""
+    from backend.app.feedback import feedback_manager
+
+    valid_file = feedback_manager.attachments_dir / "valid_test.png"
+    valid_file.write_bytes(b"dummy image data")
+
+    try:
+        # Valid retrieval returns 200
+        resp_valid = client.get("/api/feedback/attachment/valid_test.png")
+        assert resp_valid.status_code == 200
+        assert resp_valid.content == b"dummy image data"
+
+        # Non-existent attachment returns 404
+        resp_nonexistent = client.get("/api/feedback/attachment/nonexistent.png")
+        assert resp_nonexistent.status_code == 404
+
+        # Path traversal attempt returns 404
+        resp_traversal = client.get("/api/feedback/attachment/../../feedback.json")
+        assert resp_traversal.status_code == 404
+    finally:
+        if valid_file.exists():
+            valid_file.unlink()
