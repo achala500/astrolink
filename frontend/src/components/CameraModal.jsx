@@ -62,6 +62,7 @@ export default function CameraModal({ isOpen, onClose, isCrimson, backendUrl }) 
           </div>
           <button
             type="button"
+            aria-label="Close Camera Modal"
             onClick={() => {
               soundEngine.playClick();
               onClose();

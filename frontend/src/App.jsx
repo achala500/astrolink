@@ -250,6 +250,7 @@ export default function App() {
       <div className="fixed top-4 left-4 z-40 flex items-center gap-2">
         <button
           type="button"
+          aria-label="Astronomer Profile & Offline/Cloud Status"
           onClick={() => {
             soundEngine.playClick();
             setAuthModalOpen(true);
@@ -267,6 +268,7 @@ export default function App() {
 
         <button
           type="button"
+          aria-label="Camera Tether, USB Detection & Multi-OS Connection"
           onClick={() => {
             soundEngine.playClick();
             setCameraModalOpen(true);
