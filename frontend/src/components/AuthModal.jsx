@@ -128,6 +128,7 @@ export default function AuthModal({ isOpen, onClose, isCrimson }) {
             </div>
             <button
               type="button"
+              aria-label="Close Auth Modal"
               onClick={onClose}
               className="p-1.5 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100 transition-all"
             >

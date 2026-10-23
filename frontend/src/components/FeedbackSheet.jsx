@@ -277,6 +277,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
       {/* Floating Action Button */}
       <button
         type="button"
+        aria-label="Report issue or suggest improvement"
         onClick={() => {
           soundEngine.playClick();
           setIsOpen(true);
@@ -315,6 +316,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
               </div>
               <button
                 type="button"
+                aria-label="Close Feedback Modal"
                 onClick={() => {
                   soundEngine.playClick();
                   setIsOpen(false);
