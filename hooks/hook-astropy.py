@@ -1,7 +1,7 @@
 """PyInstaller custom hook for astropy.
 
-Prevents hook failures when matplotlib is excluded by filtering out astropy.visualization
-submodules that depend on matplotlib.
+Prevents hook and binary dependency search failures when matplotlib is excluded
+by filtering out astropy.visualization submodules.
 """
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
@@ -10,4 +10,5 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 hiddenimports = [
     mod for mod in collect_submodules('astropy', filter=lambda name: not name.startswith('astropy.visualization'))
 ]
-datas = collect_data_files('astropy')
+datas = collect_data_files('astropy', excludes=['**/visualization/**'])
+excludedimports = ['astropy.visualization', 'matplotlib']
