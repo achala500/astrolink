@@ -10,3 +10,8 @@ hiddenimports = collect_submodules(
     "astropy",
     filter=lambda name: "visualization" not in name
 )
+
+excludedimports = [
+    "astropy.visualization",
+    "astropy.visualization.wcsaxes",
+]
