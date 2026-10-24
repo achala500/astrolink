@@ -35,11 +35,14 @@ def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
         return gray.copy()
 
     img = gray.astype(np.float32)
-    p_low = float(np.percentile(img, 1))
-    p_high = float(np.percentile(img, 99.8))
+    # Performance optimization: For large images (>=512x512), use strided subsampling
+    # [::4, ::4] to estimate percentiles ~16x faster with negligible statistical variance.
+    sample = img[::4, ::4] if img.shape[0] >= 512 and img.shape[1] >= 512 else img
+    p_low = float(np.percentile(sample, 1))
+    p_high = float(np.percentile(sample, 99.8))
 
     if p_high <= p_low:
-        p_low, p_high = float(np.min(img)), float(np.max(img))
+        p_low, p_high = float(np.min(sample)), float(np.max(sample))
 
     if p_high > p_low:
         scaled = np.clip((img - p_low) / (p_high - p_low) * 255.0, 0.0, 255.0)
@@ -48,11 +51,21 @@ def _extract_gray_u8(image: np.ndarray) -> np.ndarray:
     return np.zeros(gray.shape[:2], dtype=np.uint8)
 
 
-def count_stars(image: np.ndarray) -> int:
-    """Estimates detectable star count via background thresholding and contour analysis."""
-    u8 = _extract_gray_u8(image)
-    med = float(np.median(u8))
-    mad = float(np.median(np.abs(u8 - med)))
+def count_stars(image: np.ndarray, u8: Optional[np.ndarray] = None) -> int:
+    """Estimates detectable star count via background thresholding and contour analysis.
+
+    Args:
+        image: Input image array.
+        u8: Optional pre-extracted uint8 normalized image to avoid redundant calculations.
+    """
+    if u8 is None:
+        u8 = _extract_gray_u8(image)
+
+    # Performance optimization: Estimate background median and MAD on subsampled pixels
+    # for large frames to avoid sorting/allocating over full multi-megapixel arrays.
+    med_sample = u8[::4, ::4] if u8.shape[0] >= 512 and u8.shape[1] >= 512 else u8
+    med = float(np.median(med_sample))
+    mad = float(np.median(np.abs(med_sample - med)))
     thresh_val = int(min(254, max(10, med + 3.0 * max(1.0, 1.4826 * mad))))
     _, binary = cv2.threshold(u8, thresh_val, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -94,8 +107,9 @@ def align_frame(
     new_u8 = _extract_gray_u8(new_frame)
 
     # Rejection Gate 1: Star count drop > 40% (clouds, thick fog, dew)
-    n_ref_stars = count_stars(ref_frame)
-    n_new_stars = count_stars(new_frame)
+    # Performance optimization: Pass pre-extracted ref_u8 and new_u8 to avoid duplicate grayscale & percentile calculations.
+    n_ref_stars = count_stars(ref_frame, u8=ref_u8)
+    n_new_stars = count_stars(new_frame, u8=new_u8)
 
     if n_ref_stars > 0:
         star_drop = (n_ref_stars - n_new_stars) / float(n_ref_stars)
