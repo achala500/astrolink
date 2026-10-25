@@ -155,6 +155,7 @@ export default function Controls({
                   onResetStack();
                 }
               }}
+              aria-label="Reset master stack"
               className={`min-h-[48px] min-w-[48px] px-3 rounded-2xl flex items-center justify-center border transition-all active:scale-95 ${
                 isCrimson 
                   ? 'border-red-900/30 text-red-500/60 hover:text-red-400 hover:bg-red-950/30' 

@@ -96,6 +96,7 @@ export default function SessionSheet({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close capture configurator"
             className="p-2 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100 transition-colors"
           >
             <X className="w-5 h-5" />
