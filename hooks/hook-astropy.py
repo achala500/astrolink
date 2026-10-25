@@ -1,19 +1,27 @@
 """Custom PyInstaller hook for astropy.
 
 Prevents astropy.visualization.wcsaxes (or other visualization modules) from attempting to import
-matplotlib during PyInstaller's analysis and binary dependency collection stages when matplotlib is excluded.
+matplotlib during PyInstaller's analysis AND child process binary dependency collection stages
+when matplotlib is excluded.
 """
 
 import sys
-import unittest.mock
+import types
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-# Create dummy mock module for matplotlib with __version__ attribute to prevent pytest.importorskip("matplotlib")
-# from throwing Skipped exception during PyInstaller module graph traversal.
-mock_matplotlib = unittest.mock.MagicMock()
-mock_matplotlib.__version__ = "3.10.0"
-sys.modules["matplotlib"] = mock_matplotlib
-sys.modules["matplotlib.pyplot"] = unittest.mock.MagicMock()
+# Dummy matplotlib module with dummy submodules to safely satisfy pytest.importorskip("matplotlib")
+# both during hook execution and during child process dependency tracing.
+class _DummyModule(types.ModuleType):
+    __version__ = "3.10.0"
+
+    def __getattr__(self, name):
+        return _DummyModule(name)
+
+dummy_mpl = _DummyModule("matplotlib")
+dummy_mpl.pyplot = _DummyModule("matplotlib.pyplot")
+
+sys.modules["matplotlib"] = dummy_mpl
+sys.modules["matplotlib.pyplot"] = dummy_mpl.pyplot
 
 hiddenimports = collect_submodules(
     'astropy',
