@@ -618,6 +618,7 @@ export default function Viewport({
             soundEngine.playClick();
             fitToScreen();
           }}
+          aria-label="Fit and center screen"
           className={`p-3 rounded-full border backdrop-blur-xl transition-all duration-200 active:scale-90 ${
             isCrimson 
               ? 'bg-black/80 border-red-900/40 text-red-500 hover:border-red-600' 
@@ -636,6 +637,7 @@ export default function Viewport({
             setTransform(prev => ({ ...prev, scale: newScale }));
             soundEngine.playClick();
           }}
+          aria-label="Zoom in"
           className={`p-3 rounded-full border backdrop-blur-xl transition-all duration-200 active:scale-90 ${
             isCrimson 
               ? 'bg-black/80 border-red-900/40 text-red-500 hover:border-red-600' 
@@ -654,6 +656,7 @@ export default function Viewport({
             setTransform(prev => ({ ...prev, scale: newScale }));
             soundEngine.playClick();
           }}
+          aria-label="Zoom out"
           className={`p-3 rounded-full border backdrop-blur-xl transition-all duration-200 active:scale-90 ${
             isCrimson 
               ? 'bg-black/80 border-red-900/40 text-red-500 hover:border-red-600' 
@@ -671,6 +674,7 @@ export default function Viewport({
             soundEngine.playClick();
             fileInputRef.current?.click();
           }}
+          aria-label="Upload sub-exposures"
           className={`p-3 rounded-full border backdrop-blur-xl transition-all duration-200 active:scale-90 ${
             isCrimson 
               ? 'bg-red-950/60 border-red-700/60 text-red-300 hover:border-red-500' 
@@ -685,6 +689,7 @@ export default function Viewport({
         <button
           type="button"
           onClick={toggleDeviceCamera}
+          aria-label={isDeviceCamActive ? "Stop device camera" : "Use device camera"}
           className={`p-3 rounded-full border backdrop-blur-xl transition-all duration-200 active:scale-90 ${
             isDeviceCamActive
               ? 'bg-red-600 border-red-500 text-white animate-pulse'
@@ -721,7 +726,9 @@ export default function Viewport({
                 setTargetPoint(null);
                 soundEngine.playClick();
               }}
+              aria-label="Close focus loupe"
               className="p-1 rounded-full hover:bg-white/10 opacity-70 hover:opacity-100"
+              title="Close focus loupe"
             >
               <X className="w-3.5 h-3.5" />
             </button>

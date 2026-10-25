@@ -281,6 +281,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
           soundEngine.playClick();
           setIsOpen(true);
         }}
+        aria-label="Open feedback hub"
         className={`fixed bottom-24 right-4 z-40 min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-2 shadow-2xl transition-all duration-300 active:scale-90 ${
           isCrimson
             ? 'bg-red-600 text-white shadow-red-950/60 hover:bg-red-500'
@@ -319,6 +320,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
                   soundEngine.playClick();
                   setIsOpen(false);
                 }}
+                aria-label="Close feedback hub"
                 className="p-2 rounded-full hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
               >
                 <X className="w-5 h-5" />
@@ -479,6 +481,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
                             <button
                               type="button"
                               onClick={() => removeAttachment(att.id)}
+                              aria-label="Remove attachment"
                               className="p-1 rounded-full bg-red-600 text-white hover:bg-red-500"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -612,6 +615,7 @@ export default function FeedbackSheet({ isCrimson, backendUrl }) {
             <button
               type="button"
               onClick={() => setPreviewImage(null)}
+              aria-label="Close image preview"
               className="absolute top-3 right-3 p-2 rounded-full bg-black/70 text-white hover:bg-black"
             >
               <X className="w-5 h-5" />
