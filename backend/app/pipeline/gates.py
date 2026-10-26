@@ -36,8 +36,10 @@ def _normalize_to_uint8(image: np.ndarray) -> np.ndarray:
         return image.copy()
 
     img = image.astype(np.float32)
-    min_val = float(np.percentile(img, 1))
-    max_val = float(np.percentile(img, 99.9))
+    # Performance optimization: use strided subsampling for percentile estimation on large images
+    sample = img[::4, ::4] if (img.shape[0] >= 512 and img.shape[1] >= 512) else img
+    min_val = float(np.percentile(sample, 1))
+    max_val = float(np.percentile(sample, 99.9))
 
     if max_val <= min_val:
         min_val, max_val = float(np.min(img)), float(np.max(img))
@@ -72,8 +74,10 @@ def check_star_eccentricity(
     u8 = _normalize_to_uint8(gray)
 
     # Threshold stars using adaptive background estimation
-    bg_median = float(np.median(u8))
-    bg_mad = float(np.median(np.abs(u8 - bg_median)))
+    # Performance optimization: strided subsampling for background noise statistics
+    bg_sample = u8[::4, ::4] if (u8.shape[0] >= 512 and u8.shape[1] >= 512) else u8
+    bg_median = float(np.median(bg_sample))
+    bg_mad = float(np.median(np.abs(bg_sample - bg_median)))
     thresh_val = int(min(254, max(15, bg_median + 2.5 * max(1.0, 1.4826 * bg_mad))))
 
     _, binary = cv2.threshold(u8, thresh_val, 255, cv2.THRESH_BINARY)
