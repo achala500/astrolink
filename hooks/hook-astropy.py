@@ -1,10 +1,13 @@
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
-# Exclude astropy.visualization.wcsaxes during submodule collection
-# to prevent pytest.importorskip("matplotlib") from raising Skipped when matplotlib is excluded
+# Exclude visualization and wcsaxes submodules to prevent pytest.importorskip("matplotlib")
+# from raising Skipped during PyInstaller find_binary_dependencies on Windows when matplotlib is excluded.
 hiddenimports = collect_submodules(
     "astropy",
-    filter=lambda name: "visualization.wcsaxes" not in name,
-    on_error="warn once",
+    filter=lambda name: not name.startswith("astropy.visualization"),
 )
-datas = collect_data_files("astropy")
+datas = collect_data_files(
+    "astropy",
+    excludes=["astropy/visualization/*", "astropy/visualization"],
+)
+excludedimports = ["astropy.visualization", "matplotlib"]
