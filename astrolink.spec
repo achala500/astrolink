@@ -120,11 +120,11 @@ hiddenimports += collect_submodules("cryptography")
 
 a = Analysis(
     ["desktop_launcher.py"],
-    pathex=[SPECPATH],
+    pathex=[SPECPATH, "hooks"],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=["hooks"],
     hooksconfig={},
     runtime_hooks=[],
     excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6"],
