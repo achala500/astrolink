@@ -152,6 +152,7 @@ export default function Dock({
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
             }`}
             title="Reset Master Stack"
+            aria-label="Reset Master Stack"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -169,6 +170,7 @@ export default function Dock({
                 : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
             }`}
             title="Export 16-Bit TIFF Master"
+            aria-label="Export 16-Bit TIFF Master"
           >
             <Download className="w-4 h-4" />
             <span className="hidden md:inline">Export</span>
@@ -187,6 +189,7 @@ export default function Dock({
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
             }`}
             title="Toggle OLED Night Crimson Mode"
+            aria-label="Toggle OLED Night Crimson Mode"
           >
             {isCrimson ? (
               <Flame className="w-4 h-4 fill-current" />
