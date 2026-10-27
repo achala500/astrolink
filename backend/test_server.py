@@ -35,6 +35,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from backend.app.feedback import feedback_manager
 from backend.app.hardware.intervalometer import CameraIntervalometer
 from backend.app.hardware.tether import CapturedFrame, GPhotoTetherDaemon
 from backend.app.main import app, intervalometer, session, ws_manager
@@ -387,3 +388,38 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+# =====================================================================
+# 6. FEEDBACK PATH TRAVERSAL SECURITY TESTS
+# =====================================================================
+
+
+def test_feedback_attachment_path_traversal_protection(client: TestClient) -> None:
+    """Verifies get_attachment_path and /api/feedback/attachment/{filename} prevent Path Traversal."""
+    # 1. Direct FeedbackManager method checks
+    # Malicious path traversal targets
+    assert feedback_manager.get_attachment_path("../../etc/passwd") is None
+    assert feedback_manager.get_attachment_path("../feedback.json") is None
+    assert feedback_manager.get_attachment_path("subdir/../../etc/passwd") is None
+
+    # Valid attachment creation and resolution test
+    valid_file = feedback_manager.attachments_dir / "valid_test.png"
+    valid_file.write_bytes(b"PNG_HEADER_TEST")
+
+    try:
+        resolved = feedback_manager.get_attachment_path("valid_test.png")
+        assert resolved is not None
+        assert resolved.resolve() == valid_file.resolve()
+
+        # 2. API Endpoint HTTP status code checks
+        # Path traversal attempt should return HTTP 404
+        resp_bad = client.get("/api/feedback/attachment/..%2F..%2Fetc%2Fpasswd")
+        assert resp_bad.status_code == 404
+
+        resp_good = client.get("/api/feedback/attachment/valid_test.png")
+        assert resp_good.status_code == 200
+        assert resp_good.content == b"PNG_HEADER_TEST"
+    finally:
+        if valid_file.exists():
+            valid_file.unlink()
