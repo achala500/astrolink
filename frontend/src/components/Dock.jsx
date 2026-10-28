@@ -47,6 +47,7 @@ export default function Dock({
                 ? 'hover:bg-red-950/40 border-transparent hover:border-red-800/40 text-red-400' 
                 : 'hover:bg-white/10 border-transparent hover:border-white/10 text-slate-300'
             }`}
+            aria-label="Configure Exposure Sequence"
             title="Configure Exposure Sequence"
           >
             <Sliders className="w-4 h-4" />
@@ -69,6 +70,8 @@ export default function Dock({
                     ? 'border-transparent hover:bg-red-950/40 text-red-500/60' 
                     : 'border-transparent hover:bg-white/5 text-slate-400')
             }`}
+            aria-label="Reveal Deep Sky (MTF Auto-Stretch)"
+            aria-pressed={revealDeepSky}
             title="Reveal Deep Sky (PixInsight MTF Stretch)"
           >
             <Sparkles className="w-4 h-4" />
@@ -91,6 +94,8 @@ export default function Dock({
                     ? 'border-transparent hover:bg-red-950/40 text-red-500/60' 
                     : 'border-transparent hover:bg-white/5 text-slate-400')
             }`}
+            aria-label="Clear City Glow (Background Gradient Removal)"
+            aria-pressed={clearCityGlow}
             title="Clear City Glow (2nd Order Polynomial Removal)"
           >
             <SunMedium className="w-4 h-4" />
@@ -112,6 +117,7 @@ export default function Dock({
                   ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/30' 
                   : 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/25'
               }`}
+              aria-label="Pause Exposure Run"
             >
               <Square className="w-4 h-4 fill-current" />
               <span>Pause Run</span>
@@ -128,6 +134,7 @@ export default function Dock({
                   ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/40' 
                   : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/30'
               }`}
+              aria-label="Start Exposure Run"
             >
               <Play className="w-4 h-4 fill-current" />
               <span>Start Shooting</span>
@@ -151,6 +158,7 @@ export default function Dock({
                 ? 'border-transparent hover:bg-red-950/40 text-red-500/70 hover:text-red-400' 
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
             }`}
+            aria-label="Reset Master Stack"
             title="Reset Master Stack"
           >
             <RotateCcw className="w-4 h-4" />
@@ -168,6 +176,7 @@ export default function Dock({
                 ? 'border-red-900/60 bg-red-950/30 hover:bg-red-900/40 text-red-400' 
                 : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
             }`}
+            aria-label="Export 16-Bit TIFF Master"
             title="Export 16-Bit TIFF Master"
           >
             <Download className="w-4 h-4" />
@@ -186,6 +195,8 @@ export default function Dock({
                 ? 'bg-red-600 text-black border-red-500' 
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
             }`}
+            aria-label="Toggle OLED Night Crimson Mode"
+            aria-pressed={isCrimson}
             title="Toggle OLED Night Crimson Mode"
           >
             {isCrimson ? (
