@@ -387,3 +387,49 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_prevention(client: TestClient) -> None:
+    """Verifies path traversal sequences and symlink escapes are blocked in feedback attachments."""
+    from backend.app.feedback import feedback_manager
+
+    # 1. Test valid attachment file
+    valid_file = feedback_manager.attachments_dir / "valid_test_img.png"
+    valid_file.write_bytes(b"PNG_FAKE_DATA")
+    try:
+        path = feedback_manager.get_attachment_path("valid_test_img.png")
+        assert path is not None
+        assert path.name == "valid_test_img.png"
+
+        resp = client.get("/api/feedback/attachment/valid_test_img.png")
+        assert resp.status_code == 200
+        assert resp.content == b"PNG_FAKE_DATA"
+
+        # 2. Test path traversal attempt
+        path_traversal = feedback_manager.get_attachment_path("../../../etc/passwd")
+        assert path_traversal is None
+
+        resp_trav = client.get("/api/feedback/attachment/..%2F..%2F..%2Fetc%2Fpasswd")
+        assert resp_trav.status_code == 404
+
+        # 3. Test symlink escape attempt pointing outside attachments_dir
+        symlink_file = feedback_manager.attachments_dir / "symlink_test.png"
+        external_file = feedback_manager.feedback_file  # Outside attachments_dir
+        if symlink_file.exists():
+            symlink_file.unlink()
+        try:
+            symlink_file.symlink_to(external_file)
+            path_sym = feedback_manager.get_attachment_path("symlink_test.png")
+            assert path_sym is None, "Symlink escape outside attachments_dir must be rejected"
+
+            resp_sym = client.get("/api/feedback/attachment/symlink_test.png")
+            assert resp_sym.status_code == 404
+        except (OSError, NotImplementedError):
+            pass  # OS without symlink permissions
+        finally:
+            if symlink_file.is_symlink() or symlink_file.exists():
+                symlink_file.unlink()
+
+    finally:
+        if valid_file.exists():
+            valid_file.unlink()
