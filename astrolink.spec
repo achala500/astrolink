@@ -120,7 +120,7 @@ hiddenimports += collect_submodules("cryptography")
 
 a = Analysis(
     ["desktop_launcher.py"],
-    pathex=[SPECPATH],
+    pathex=[SPECPATH, os.path.join(SPECPATH, "hooks")],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
