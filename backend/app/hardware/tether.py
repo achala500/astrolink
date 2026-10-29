@@ -151,13 +151,25 @@ fi
                     lines = ipc_file.read_text(encoding="utf-8").splitlines()
                     # Truncate after reading
                     ipc_file.write_text("", encoding="utf-8")
+                    watch_base = self.watch_dir.resolve()
                     for line in lines:
-                        target_path = Path(line.strip())
+                        raw = line.strip()
+                        if not raw:
+                            continue
+                        target_path = Path(raw)
                         if not target_path.is_absolute():
                             target_path = self.watch_dir / target_path
-                        if target_path.exists() and target_path not in seen_files:
-                            self._ingest_file(target_path)
-                            seen_files.add(target_path)
+                        try:
+                            resolved_target = target_path.resolve()
+                            # Security: Ensure file is inside watch_dir to prevent path traversal
+                            if resolved_target.is_file() and resolved_target.is_relative_to(watch_base):
+                                if resolved_target not in seen_files:
+                                    self._ingest_file(resolved_target)
+                                    seen_files.add(resolved_target)
+                            else:
+                                logger.warning("Security: Blocked tether path traversal attempt: %s", raw)
+                        except Exception as path_err:
+                            logger.warning("Security: Invalid tether event path '%s': %s", raw, path_err)
                 except Exception as e:
                     logger.debug("Error processing hook IPC log: %s", e)
 

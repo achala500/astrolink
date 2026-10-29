@@ -387,3 +387,30 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_tether_daemon_path_traversal_prevention() -> None:
+    """Verifies that GPhotoTetherDaemon rejects path traversal attempts in IPC event log."""
+    received: List[CapturedFrame] = []
+
+    daemon = GPhotoTetherDaemon(on_frame_callback=lambda f: received.append(f), simulate=True)
+    daemon.start()
+
+    # Create a secret file outside watch_dir
+    secret_file = daemon.watch_dir.parent / "secret_data.txt"
+    secret_file.write_text("SENSITIVE_DATA", encoding="utf-8")
+
+    try:
+        # Write traversal attempt and absolute path into .gphoto_events.txt
+        ipc_file = daemon.watch_dir / ".gphoto_events.txt"
+        ipc_file.write_text(f"../{secret_file.name}\n{secret_file.resolve()}\n", encoding="utf-8")
+
+        # Give worker thread time to process IPC events
+        time.sleep(0.3)
+
+        # Confirm no frames were ingested from outside watch_dir
+        assert len(received) == 0, "Security failure: File outside watch_dir was ingested"
+    finally:
+        daemon.stop()
+        if secret_file.exists():
+            secret_file.unlink()
