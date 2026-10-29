@@ -127,7 +127,16 @@ a = Analysis(
     hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6"],
+    excludes=[
+        "tkinter",
+        "matplotlib",
+        "astropy.visualization",
+        "astropy.visualization.wcsaxes",
+        "PyQt5",
+        "PyQt6",
+        "PySide2",
+        "PySide6",
+    ],
     noarchive=False,
     optimize=0,
 )
