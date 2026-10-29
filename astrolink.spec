@@ -34,7 +34,12 @@ binaries += collect_dynamic_libs("rawpy")
 
 # 2. Collect package data files
 datas = []
-datas += collect_data_files("astropy")
+datas += collect_data_files("astropy.io.fits")
+datas += collect_data_files("astropy.config")
+datas += collect_data_files("astropy.utils")
+datas += collect_data_files("astropy.table")
+datas += collect_data_files("astropy.coordinates")
+datas += collect_data_files("astropy.units")
 datas += collect_data_files("scipy")
 datas += collect_data_files("cryptography")
 datas += collect_data_files("rawpy")
