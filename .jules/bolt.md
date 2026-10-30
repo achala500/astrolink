@@ -1,0 +1,5 @@
+# Bolt's Performance Journal
+
+## 2026-10-30 - Vectorized 1D Coordinate Broadcasting for 2D Polynomial Surface Evaluation
+**Learning:** In astronomical background gradient removal (`backend/app/pipeline/gradient.py`), evaluating a fitted bivariate polynomial across a full-resolution image (e.g., 2000x2000) by building full 2D meshgrids (`np.mgrid`) and constructing the full feature matrix (`full_features = (H*W, num_terms)`) incurs massive memory allocation (~192MB) and heavy matrix multiplication (`full_features @ coeffs`), taking ~1360ms per channel. Because bivariate polynomial terms $(x^i \cdot y^j)$ are separable, calculating 1D coordinate vectors $x \in \mathbb{R}^{1 \times W}$ and $y \in \mathbb{R}^{H \times 1}$ and using NumPy broadcasting directly accumulates each term into $(H, W)$ in $O(1)$ auxiliary memory and evaluates ~7x faster (~195ms on 2000x2000, ~17ms on 800x800).
+**Action:** Always prefer 1D vector broadcasting over 2D meshgrid feature matrix expansion when evaluating separable coordinate surfaces.
