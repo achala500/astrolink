@@ -124,10 +124,10 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=["hooks"],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "PyQt5", "PyQt6", "PySide2", "PySide6"],
+    excludes=["tkinter", "matplotlib", "astropy.visualization", "PyQt5", "PyQt6", "PySide2", "PySide6"],
     noarchive=False,
     optimize=0,
 )
