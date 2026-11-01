@@ -1,0 +1,4 @@
+## 2026-11-01 - Path Traversal Prevention in Attachment Retrieval
+**Vulnerability:** In `FeedbackManager.get_attachment_path`, relying solely on `Path(filename).name` was insufficient to guard against directory navigation edge cases (such as empty strings or `..` resolving to parent directories) or symlink escapes when checking file paths.
+**Learning:** `Path(filename).name` preserves `..` if passed directly without path components. Using `target.resolve().is_relative_to(base_dir.resolve())` guarantees that regardless of traversal sequences, symlinks, or special path tokens, the resulting target path cannot escape the intended attachment root.
+**Prevention:** Always combine `Path(filename).name` extraction with explicit canonical path resolution and `target.resolve().is_relative_to(base_dir.resolve())` checks before performing file system operations on user-supplied file identifiers.

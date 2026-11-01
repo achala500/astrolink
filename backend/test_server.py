@@ -387,3 +387,41 @@ def test_hardware_tether_daemon() -> None:
 
     daemon.stop()
     assert daemon.is_running is False
+
+
+def test_feedback_attachment_path_traversal_prevention(client: TestClient) -> None:
+    """Verifies that path traversal attacks on attachment endpoints are strictly blocked."""
+    from backend.app.feedback import feedback_manager
+
+    # 1. Test traversal patterns return 404
+    traversal_payloads = [
+        "..%2Ffeedback.json",
+        "....//feedback.json",
+        "%2e%2e%2ffeedback.json",
+        "passwd",
+        "nested/sub/file.png",
+    ]
+    for payload in traversal_payloads:
+        resp = client.get(f"/api/feedback/attachment/{payload}")
+        assert resp.status_code == 404, f"Payload '{payload}' expected 404 but got {resp.status_code}"
+
+    # 2. Test manager method directly
+    assert feedback_manager.get_attachment_path("..") is None
+    assert feedback_manager.get_attachment_path("../feedback.json") is None
+    assert feedback_manager.get_attachment_path("") is None
+    assert feedback_manager.get_attachment_path("non_existent_file.png") is None
+
+    # 3. Test valid attachment serves successfully
+    test_file = feedback_manager.attachments_dir / "valid_test_attachment.png"
+    test_file.write_bytes(b"\x89PNG\r\n\x1a\nfakecontent")
+    try:
+        resolved_path = feedback_manager.get_attachment_path("valid_test_attachment.png")
+        assert resolved_path is not None
+        assert resolved_path.is_file()
+
+        resp = client.get("/api/feedback/attachment/valid_test_attachment.png")
+        assert resp.status_code == 200
+        assert resp.content == b"\x89PNG\r\n\x1a\nfakecontent"
+    finally:
+        if test_file.exists():
+            test_file.unlink()
