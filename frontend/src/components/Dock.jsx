@@ -26,6 +26,10 @@ export default function Dock({
   clearCityGlow,
   onToggleClearCityGlow
 }) {
+  const focusRing = isCrimson
+    ? 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+    : 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-2xl pointer-events-auto">
       <div className={`p-2 sm:p-2.5 rounded-full border shadow-2xl backdrop-blur-2xl flex items-center justify-between gap-1 sm:gap-2 transition-all duration-300 ease-apple-spring ${
@@ -42,12 +46,13 @@ export default function Dock({
               soundEngine.playClick();
               onOpenSettings();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRing} ${
               isCrimson 
                 ? 'hover:bg-red-950/40 border-transparent hover:border-red-800/40 text-red-400' 
                 : 'hover:bg-white/10 border-transparent hover:border-white/10 text-slate-300'
             }`}
             title="Configure Exposure Sequence"
+            aria-label="Configure Exposure Sequence Plan"
           >
             <Sliders className="w-4 h-4" />
             <span className="hidden md:inline">Plan</span>
@@ -60,7 +65,7 @@ export default function Dock({
               soundEngine.playClick();
               onToggleRevealDeepSky();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRing} ${
               revealDeepSky 
                 ? (isCrimson 
                     ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50' 
@@ -70,6 +75,8 @@ export default function Dock({
                     : 'border-transparent hover:bg-white/5 text-slate-400')
             }`}
             title="Reveal Deep Sky (PixInsight MTF Stretch)"
+            aria-label="Reveal Deep Sky MTF Auto-Stretch"
+            aria-pressed={revealDeepSky}
           >
             <Sparkles className="w-4 h-4" />
             <span className="hidden md:inline">Reveal Sky</span>
@@ -82,7 +89,7 @@ export default function Dock({
               soundEngine.playClick();
               onToggleClearCityGlow();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRing} ${
               clearCityGlow 
                 ? (isCrimson 
                     ? 'bg-red-900/40 border-red-600 text-red-300' 
@@ -92,6 +99,8 @@ export default function Dock({
                     : 'border-transparent hover:bg-white/5 text-slate-400')
             }`}
             title="Clear City Glow (2nd Order Polynomial Removal)"
+            aria-label="Clear City Glow Gradient Removal"
+            aria-pressed={clearCityGlow}
           >
             <SunMedium className="w-4 h-4" />
             <span className="hidden md:inline">Clear Glow</span>
@@ -107,11 +116,12 @@ export default function Dock({
                 soundEngine.playClick();
                 onStopSequence();
               }}
-              className={`h-12 px-5 sm:px-6 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${
+              className={`h-12 px-5 sm:px-6 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${focusRing} ${
                 isCrimson 
                   ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/30' 
                   : 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/25'
               }`}
+              aria-label="Pause Exposure Sequence"
             >
               <Square className="w-4 h-4 fill-current" />
               <span>Pause Run</span>
@@ -123,11 +133,12 @@ export default function Dock({
                 soundEngine.playClick();
                 onStartSequence();
               }}
-              className={`h-12 px-5 sm:px-7 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${
+              className={`h-12 px-5 sm:px-7 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${focusRing} ${
                 isCrimson 
                   ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/40' 
                   : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/30'
               }`}
+              aria-label="Start Exposure Shooting Sequence"
             >
               <Play className="w-4 h-4 fill-current" />
               <span>Start Shooting</span>
@@ -146,12 +157,13 @@ export default function Dock({
                 onResetStack();
               }
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${focusRing} ${
               isCrimson 
                 ? 'border-transparent hover:bg-red-950/40 text-red-500/70 hover:text-red-400' 
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
             }`}
             title="Reset Master Stack"
+            aria-label="Reset Master Stacking Session"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -163,12 +175,13 @@ export default function Dock({
               soundEngine.playClick();
               onOpenExport();
             }}
-            className={`min-w-[48px] h-12 px-3.5 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            className={`min-w-[48px] h-12 px-3.5 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRing} ${
               isCrimson 
                 ? 'border-red-900/60 bg-red-950/30 hover:bg-red-900/40 text-red-400' 
                 : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
             }`}
             title="Export 16-Bit TIFF Master"
+            aria-label="Export Master 16-Bit TIFF"
           >
             <Download className="w-4 h-4" />
             <span className="hidden md:inline">Export</span>
@@ -181,12 +194,14 @@ export default function Dock({
               soundEngine.playClick();
               onToggleCrimson();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${focusRing} ${
               isCrimson 
                 ? 'bg-red-600 text-black border-red-500' 
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
             }`}
             title="Toggle OLED Night Crimson Mode"
+            aria-label="Toggle OLED Night Crimson Mode"
+            aria-pressed={isCrimson}
           >
             {isCrimson ? (
               <Flame className="w-4 h-4 fill-current" />
