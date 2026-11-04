@@ -1,0 +1,5 @@
+# Palette's Journal - Critical UX & Accessibility Learnings
+
+## 2026-11-04 - Scotopic Vision Preservation in Keyboard Navigation Focus Indicators
+**Learning:** In field astrophotography interfaces designed for dark-adapted vision (scotopic vision in Bortle 1–3 environments), standard bright-white or default browser focus rings instantly cause night blindness. Focus indicators must dynamically adapt to the active night vision theme: standard dark mode benefits from emerald (`focus-visible:ring-emerald-400`), while OLED Crimson mode strictly requires pure red (`focus-visible:ring-red-500`) with black offsets (`focus-visible:ring-offset-black`).
+**Action:** When styling keyboard-accessible controls, pair `focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-black` with conditional theme classes (`isCrimson ? 'focus-visible:ring-red-500' : 'focus-visible:ring-emerald-400'`) and provide explicit `aria-label` and `aria-pressed` semantics on toggleable buttons.
