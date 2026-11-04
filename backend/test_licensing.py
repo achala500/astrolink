@@ -2,8 +2,18 @@
 
 import base64
 import json
+import os
 import numpy as np
 import pytest
+
+# Test private key matching the public key MASTER_PUBLIC_KEY_HEX
+# Kept strictly in tests for validation and key minting test coverage
+TEST_PRIVATE_KEY_HEX = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+
+@pytest.fixture(autouse=True)
+def setup_test_signing_key(monkeypatch):
+    """Provides test signing key via environment variable to mint_license."""
+    monkeypatch.setenv("ASTROLINK_MASTER_PRIVATE_KEY", TEST_PRIVATE_KEY_HEX)
 
 from backend.app.licensing import (
     LicenseManager,
@@ -54,6 +64,14 @@ def test_malformed_key_handling():
     empty_status = verify_license_key("")
     assert empty_status.is_valid is False
     assert empty_status.max_frames == UNVERIFIED_FRAME_LIMIT
+
+
+def test_mint_license_without_private_key_raises_error(monkeypatch):
+    """mint_license must raise ValueError when no private key is configured."""
+    monkeypatch.delenv("ASTROLINK_MASTER_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("ASTROLINK_PRIVATE_KEY", raising=False)
+    with pytest.raises(ValueError, match="Private signing key required"):
+        mint_license("Galileo Galilei", "field_pro")
 
 
 def test_license_manager_activation_and_deactivation(tmp_path):
