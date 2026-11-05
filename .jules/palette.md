@@ -1,0 +1,5 @@
+# Palette's Journal - Critical UX & Accessibility Learnings
+
+## 2026-04-06 - Night-Vision Adaptive Keyboard Focus Rings and Responsive Dock ARIA Labels
+**Learning:** In astronomical field tools with dark and OLED Crimson modes, default browser focus rings (often bright blue) ruin dark adaptation (scotopic vision). Interactive controls require theme-aware `focus-visible` styling (`focus-visible:ring-emerald-400` in standard dark mode vs `focus-visible:ring-red-500` in Crimson mode) to ensure keyboard navigation is visible without blinding astronomers in the field. Additionally, when dock buttons hide text labels on smaller screens via `hidden md:inline` or are icon-only (e.g., reset stack, crimson mode toggle), explicit `aria-label` and `aria-pressed` attributes are essential to preserve accessibility across all viewports.
+**Action:** When creating or refining interactive toolbar or dock buttons, always pair them with theme-adaptive `focus-visible` ring tokens and ensure icon-only / responsively hidden labels have explicit ARIA labels and pressed states.
