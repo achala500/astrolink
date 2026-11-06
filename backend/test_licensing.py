@@ -13,6 +13,23 @@ from backend.app.licensing import (
 )
 from backend.app.main import AstrophotographySession
 
+# Dedicated test signing key matching MASTER_PUBLIC_KEY_HEX for test suites
+TEST_PRIVATE_KEY_HEX = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+
+
+@pytest.fixture(autouse=True)
+def setup_test_master_key(monkeypatch):
+    """Provides the test signing key via environment variable for test execution."""
+    monkeypatch.setenv("ASTROLINK_MASTER_PRIVATE_KEY", TEST_PRIVATE_KEY_HEX)
+
+
+def test_mint_license_without_key_raises_error(monkeypatch):
+    """mint_license must refuse to execute when no private signing key is configured."""
+    monkeypatch.delenv("ASTROLINK_MASTER_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("ASTROLINK_PRIVATE_KEY", raising=False)
+    with pytest.raises(ValueError, match="Master signing key not configured"):
+        mint_license("Carl Sagan", "lifetime")
+
 
 def test_mint_and_verify_valid_license():
     """Valid Ed25519 license should verify completely offline with unlimited frames."""
