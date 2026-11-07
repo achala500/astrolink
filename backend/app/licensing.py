@@ -27,10 +27,6 @@ logger = logging.getLogger("astrolink.licensing")
 # Used exclusively for in-binary offline verification
 MASTER_PUBLIC_KEY_HEX: str = "1658de0da16562b43a7afbf9fa6e84589ce1c28b260259640dbb17001a4b7dd0"
 
-# Optional private key for offline key-generation/minting tools and testing
-# In a secure SaaS environment, this key resides solely in the licensing server.
-_MASTER_PRIVATE_KEY_HEX: str = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
-
 # Community Trial frame limit for unverified instances
 UNVERIFIED_FRAME_LIMIT: int = 10
 
@@ -219,8 +215,19 @@ def mint_license(
     Returns:
         Base64-encoded license key string ready for offline deployment.
     """
-    priv_hex = private_key_hex or _MASTER_PRIVATE_KEY_HEX
-    priv_bytes = bytes.fromhex(priv_hex)
+    # Private signing key must be explicitly provided or configured via environment variable
+    # Never hardcode private keys in binary releases
+    priv_hex = (
+        private_key_hex
+        or os.environ.get("ASTROLINK_MASTER_PRIVATE_KEY")
+        or os.environ.get("ASTROLINK_PRIVATE_KEY")
+    )
+    if not priv_hex:
+        raise ValueError(
+            "Ed25519 master private key must be provided via 'private_key_hex' parameter "
+            "or ASTROLINK_MASTER_PRIVATE_KEY / ASTROLINK_PRIVATE_KEY environment variable."
+        )
+    priv_bytes = bytes.fromhex(priv_hex.strip())
     private_key = ed25519.Ed25519PrivateKey.from_private_bytes(priv_bytes)
 
     # Canonical message format
