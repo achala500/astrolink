@@ -1,0 +1,5 @@
+# Palette Agent UX & Accessibility Learnings
+
+## 2026-11-07 - Adaptive Night-Vision Keyboard Focus Rings & Astrophotography ARIA Semantics
+**Learning:** In astronomical observation interfaces operating under strict dark-sky conditions (such as AstroLink's OLED Crimson mode), standard browser or high-contrast focus rings (like vibrant blue or white) ruin scotopic dark adaptation. Simultaneously, icon-dense floating control pills like `Dock` rely on responsive text labels that collapse to icon-only triggers on smaller viewports. Assistive technology requires explicit `aria-label` attributes and `aria-pressed` states on filter toggles (such as PixInsight MTF auto-stretch or background gradient extraction) to convey active stacking state without auditory or visual disruption.
+**Action:** Always provide theme-adaptive `focus-visible:ring-*` styles matching the active night vision theme (`focus-visible:ring-red-500` under Crimson mode vs `focus-visible:ring-emerald-400` in default dark mode) and ensure all toggleable astrophotography actions expose `aria-pressed` and descriptive `aria-label`s.

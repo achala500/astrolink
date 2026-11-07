@@ -26,6 +26,10 @@ export default function Dock({
   clearCityGlow,
   onToggleClearCityGlow
 }) {
+  const focusRingClass = isCrimson
+    ? 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 focus-visible:ring-offset-black'
+    : 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-950';
+
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-2xl pointer-events-auto">
       <div className={`p-2 sm:p-2.5 rounded-full border shadow-2xl backdrop-blur-2xl flex items-center justify-between gap-1 sm:gap-2 transition-all duration-300 ease-apple-spring ${
@@ -42,7 +46,8 @@ export default function Dock({
               soundEngine.playClick();
               onOpenSettings();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            aria-label="Configure Exposure Sequence"
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRingClass} ${
               isCrimson 
                 ? 'hover:bg-red-950/40 border-transparent hover:border-red-800/40 text-red-400' 
                 : 'hover:bg-white/10 border-transparent hover:border-white/10 text-slate-300'
@@ -60,7 +65,9 @@ export default function Dock({
               soundEngine.playClick();
               onToggleRevealDeepSky();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            aria-label="Reveal Deep Sky MTF Auto-Stretch"
+            aria-pressed={revealDeepSky}
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRingClass} ${
               revealDeepSky 
                 ? (isCrimson 
                     ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50' 
@@ -82,7 +89,9 @@ export default function Dock({
               soundEngine.playClick();
               onToggleClearCityGlow();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            aria-label="Clear City Glow Polynomial Background Removal"
+            aria-pressed={clearCityGlow}
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRingClass} ${
               clearCityGlow 
                 ? (isCrimson 
                     ? 'bg-red-900/40 border-red-600 text-red-300' 
@@ -107,7 +116,8 @@ export default function Dock({
                 soundEngine.playClick();
                 onStopSequence();
               }}
-              className={`h-12 px-5 sm:px-6 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${
+              aria-label="Pause Current Sequence Run"
+              className={`h-12 px-5 sm:px-6 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${focusRingClass} ${
                 isCrimson 
                   ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/30' 
                   : 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/25'
@@ -123,7 +133,8 @@ export default function Dock({
                 soundEngine.playClick();
                 onStartSequence();
               }}
-              className={`h-12 px-5 sm:px-7 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${
+              aria-label="Start Exposure Sequence Shooting"
+              className={`h-12 px-5 sm:px-7 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${focusRingClass} ${
                 isCrimson 
                   ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/40' 
                   : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/30'
@@ -146,7 +157,8 @@ export default function Dock({
                 onResetStack();
               }
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
+            aria-label="Reset Master Stack"
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${focusRingClass} ${
               isCrimson 
                 ? 'border-transparent hover:bg-red-950/40 text-red-500/70 hover:text-red-400' 
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
@@ -163,7 +175,8 @@ export default function Dock({
               soundEngine.playClick();
               onOpenExport();
             }}
-            className={`min-w-[48px] h-12 px-3.5 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            aria-label="Export 16-Bit Master TIFF"
+            className={`min-w-[48px] h-12 px-3.5 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRingClass} ${
               isCrimson 
                 ? 'border-red-900/60 bg-red-950/30 hover:bg-red-900/40 text-red-400' 
                 : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
@@ -181,7 +194,9 @@ export default function Dock({
               soundEngine.playClick();
               onToggleCrimson();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
+            aria-label="Toggle OLED Night Crimson Mode"
+            aria-pressed={isCrimson}
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${focusRingClass} ${
               isCrimson 
                 ? 'bg-red-600 text-black border-red-500' 
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
