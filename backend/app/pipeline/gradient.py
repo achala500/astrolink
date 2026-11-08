@@ -73,13 +73,23 @@ def _process_single_channel_gradient(
 
     coeffs, _, _, _ = np.linalg.lstsq(a_valid, z_valid, rcond=None)
 
-    # Evaluate fitted background model across full image resolution
-    y_full, x_full = np.mgrid[0:h, 0:w]
-    x_full_norm = (2.0 * x_full / max(1, w - 1)) - 1.0
-    y_full_norm = (2.0 * y_full / max(1, h - 1)) - 1.0
+    # Evaluate fitted background model across full image resolution.
+    # Performance Optimization (Bolt):
+    # Instead of allocating full 2D coordinate meshgrids and an (H*W, N) feature matrix
+    # which consumes ~400MB RAM and takes seconds on high-res / 4K frames, evaluate
+    # polynomial terms directly using 1D coordinate broadcasting (1, W) and (H, 1).
+    x_1d = ((2.0 * np.arange(w, dtype=np.float32) / max(1, w - 1)) - 1.0).reshape(1, w)
+    y_1d = ((2.0 * np.arange(h, dtype=np.float32) / max(1, h - 1)) - 1.0).reshape(h, 1)
 
-    full_features = _build_bivariate_poly_features(x_full_norm, y_full_norm, order=order)
-    background_model = (full_features @ coeffs).reshape(h, w)
+    background_model = np.zeros((h, w), dtype=np.float32)
+    c_idx = 0
+    for total_deg in range(order + 1):
+        for i in range(total_deg + 1):
+            j = total_deg - i
+            term_x = (x_1d**i) if i > 0 else 1.0
+            term_y = (y_1d**j) if j > 0 else 1.0
+            background_model += np.float32(coeffs[c_idx]) * (term_y * term_x)
+            c_idx += 1
 
     # Pedestal level: preserve the median background level so shadows are not clipped
     pedestal = float(np.median(background_model))
