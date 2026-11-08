@@ -32,7 +32,10 @@ export default function Dock({
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-2xl pointer-events-auto">
-      <div className={`p-2 sm:p-2.5 rounded-full border shadow-2xl backdrop-blur-2xl flex items-center justify-between gap-1 sm:gap-2 transition-all duration-300 ease-apple-spring ${
+      <div
+        role="toolbar"
+        aria-label="Telescope and Stacking Controls"
+        className={`p-2 sm:p-2.5 rounded-full border shadow-2xl backdrop-blur-2xl flex items-center justify-between gap-1 sm:gap-2 transition-all duration-300 ease-apple-spring ${
         isCrimson 
           ? 'bg-black/95 border-red-900/50 text-red-500 shadow-red-950/20' 
           : 'bg-slate-950/85 border-white/10 text-slate-300 shadow-black/40'
