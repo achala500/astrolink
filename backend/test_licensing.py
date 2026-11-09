@@ -14,6 +14,16 @@ from backend.app.licensing import (
 from backend.app.main import AstrophotographySession
 
 
+# Ephemeral test key matching master public key for unit testing
+TEST_PRIVATE_KEY_HEX = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+
+
+@pytest.fixture(autouse=True)
+def setup_test_signing_key(monkeypatch):
+    """Provides test private key via environment variable without hardcoding in production source."""
+    monkeypatch.setenv("ASTROLINK_MASTER_PRIVATE_KEY", TEST_PRIVATE_KEY_HEX)
+
+
 def test_mint_and_verify_valid_license():
     """Valid Ed25519 license should verify completely offline with unlimited frames."""
     key = mint_license("Hubble Observer", "lifetime")
@@ -26,6 +36,14 @@ def test_mint_and_verify_valid_license():
     assert status.tier == "lifetime"
     assert status.max_frames is None  # Unlimited
     assert status.error is None
+
+
+def test_mint_license_without_private_key_fails(monkeypatch):
+    """Minting license without configured private key must raise ValueError."""
+    monkeypatch.delenv("ASTROLINK_MASTER_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("ASTROLINK_PRIVATE_KEY", raising=False)
+    with pytest.raises(ValueError, match="Private signing key required"):
+        mint_license("Dark Sky Observer", "lifetime")
 
 
 def test_tampered_license_rejection():
