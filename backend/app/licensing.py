@@ -27,10 +27,6 @@ logger = logging.getLogger("astrolink.licensing")
 # Used exclusively for in-binary offline verification
 MASTER_PUBLIC_KEY_HEX: str = "1658de0da16562b43a7afbf9fa6e84589ce1c28b260259640dbb17001a4b7dd0"
 
-# Optional private key for offline key-generation/minting tools and testing
-# In a secure SaaS environment, this key resides solely in the licensing server.
-_MASTER_PRIVATE_KEY_HEX: str = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
-
 # Community Trial frame limit for unverified instances
 UNVERIFIED_FRAME_LIMIT: int = 10
 
@@ -214,13 +210,24 @@ def mint_license(
         licensee: Full name or callsign of the astronomer.
         tier: License tier ("lifetime", "field_pro", etc.).
         issued_at: Optional ISO timestamp.
-        private_key_hex: 32-byte Ed25519 private key in hex. Uses master key if None.
+        private_key_hex: 32-byte Ed25519 private key in hex. If None, retrieves
+            from ASTROLINK_MASTER_PRIVATE_KEY or ASTROLINK_PRIVATE_KEY env vars.
 
     Returns:
         Base64-encoded license key string ready for offline deployment.
     """
-    priv_hex = private_key_hex or _MASTER_PRIVATE_KEY_HEX
-    priv_bytes = bytes.fromhex(priv_hex)
+    priv_hex = (
+        private_key_hex
+        or os.environ.get("ASTROLINK_MASTER_PRIVATE_KEY")
+        or os.environ.get("ASTROLINK_PRIVATE_KEY")
+    )
+    if not priv_hex:
+        raise ValueError(
+            "Private signing key required to mint licenses. "
+            "Set ASTROLINK_MASTER_PRIVATE_KEY environment variable or pass private_key_hex explicitly."
+        )
+
+    priv_bytes = bytes.fromhex(priv_hex.strip())
     private_key = ed25519.Ed25519PrivateKey.from_private_bytes(priv_bytes)
 
     # Canonical message format
@@ -347,7 +354,12 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "mint":
         name = sys.argv[2] if len(sys.argv) > 2 else "Dark Sky Explorer"
         tier_arg = sys.argv[3] if len(sys.argv) > 3 else "lifetime"
-        minted_key = mint_license(name, tier_arg)
+        key_arg = sys.argv[4] if len(sys.argv) > 4 else None
+        try:
+            minted_key = mint_license(name, tier_arg, private_key_hex=key_arg)
+        except ValueError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
         print("\n================ AstroLink Master Key Minter ================")
         print(f"Licensee: {name}")
         print(f"Tier:     {tier_arg}")
