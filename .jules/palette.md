@@ -1,0 +1,3 @@
+## 2025-05-18 - Scotopic Focus Rings and ARIA Roles in Astronomical Toolbars
+**Learning:** In astrophotography applications with dedicated dark and OLED Crimson night modes, keyboard focus states must dynamically adapt (`focus-visible:ring-red-500` vs `focus-visible:ring-emerald-400`) to prevent white/bright light from destroying user dark adaptation. Floating navigation docks should declare `role="toolbar"` and explicit `aria-label` / `aria-pressed` states on icon-dominant buttons so assistive technologies can navigate hardware controls effectively without visual interference.
+**Action:** Always provide theme-aware `focus-visible` ring colors matching active dark/scotopic modes and equip interactive icon toggles with `aria-pressed` and descriptive labels.

@@ -26,23 +26,32 @@ export default function Dock({
   clearCityGlow,
   onToggleClearCityGlow
 }) {
+  const focusRing = isCrimson
+    ? 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500'
+    : 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400';
+
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94vw] max-w-2xl pointer-events-auto">
-      <div className={`p-2 sm:p-2.5 rounded-full border shadow-2xl backdrop-blur-2xl flex items-center justify-between gap-1 sm:gap-2 transition-all duration-300 ease-apple-spring ${
-        isCrimson 
-          ? 'bg-black/95 border-red-900/50 text-red-500 shadow-red-950/20' 
-          : 'bg-slate-950/85 border-white/10 text-slate-300 shadow-black/40'
-      }`}>
+      <div
+        role="toolbar"
+        aria-label="Telescope Controls"
+        className={`p-2 sm:p-2.5 rounded-full border shadow-2xl backdrop-blur-2xl flex items-center justify-between gap-1 sm:gap-2 transition-all duration-300 ease-apple-spring ${
+          isCrimson
+            ? 'bg-black/95 border-red-900/50 text-red-500 shadow-red-950/20'
+            : 'bg-slate-950/85 border-white/10 text-slate-300 shadow-black/40'
+        }`}
+      >
         {/* Left Side: Capture Settings & Filter Toggles */}
         <div className="flex items-center gap-1 sm:gap-1.5">
           {/* Settings Configurator (48px hit target) */}
           <button
             type="button"
+            aria-label="Configure Exposure Sequence"
             onClick={() => {
               soundEngine.playClick();
               onOpenSettings();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRing} ${
               isCrimson 
                 ? 'hover:bg-red-950/40 border-transparent hover:border-red-800/40 text-red-400' 
                 : 'hover:bg-white/10 border-transparent hover:border-white/10 text-slate-300'
@@ -56,11 +65,13 @@ export default function Dock({
           {/* Reveal Deep Sky (MTF Auto-Stretch Toggle) */}
           <button
             type="button"
+            aria-label="Reveal Deep Sky (PixInsight MTF Stretch)"
+            aria-pressed={revealDeepSky}
             onClick={() => {
               soundEngine.playClick();
               onToggleRevealDeepSky();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRing} ${
               revealDeepSky 
                 ? (isCrimson 
                     ? 'bg-red-900/40 border-red-600 text-red-300 shadow-lg shadow-red-950/50' 
@@ -78,11 +89,13 @@ export default function Dock({
           {/* Clear City Glow (Background Gradient Removal Toggle) */}
           <button
             type="button"
+            aria-label="Clear City Glow (2nd Order Polynomial Removal)"
+            aria-pressed={clearCityGlow}
             onClick={() => {
               soundEngine.playClick();
               onToggleClearCityGlow();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRing} ${
               clearCityGlow 
                 ? (isCrimson 
                     ? 'bg-red-900/40 border-red-600 text-red-300' 
@@ -103,11 +116,12 @@ export default function Dock({
           {isRunning ? (
             <button
               type="button"
+              aria-label="Pause Exposure Sequence"
               onClick={() => {
                 soundEngine.playClick();
                 onStopSequence();
               }}
-              className={`h-12 px-5 sm:px-6 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${
+              className={`h-12 px-5 sm:px-6 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${focusRing} ${
                 isCrimson 
                   ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/30' 
                   : 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/25'
@@ -119,11 +133,12 @@ export default function Dock({
           ) : (
             <button
               type="button"
+              aria-label="Start Exposure Sequence"
               onClick={() => {
                 soundEngine.playClick();
                 onStartSequence();
               }}
-              className={`h-12 px-5 sm:px-7 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${
+              className={`h-12 px-5 sm:px-7 rounded-full flex items-center justify-center gap-2 font-semibold text-xs tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-xl ${focusRing} ${
                 isCrimson 
                   ? 'bg-red-600 text-black hover:bg-red-500 shadow-red-600/40' 
                   : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/30'
@@ -140,13 +155,14 @@ export default function Dock({
           {/* Reset Stack */}
           <button
             type="button"
+            aria-label="Reset Master Stack"
             onClick={() => {
               if (window.confirm('Reset current stack and start fresh session?')) {
                 soundEngine.playClick();
                 onResetStack();
               }
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${focusRing} ${
               isCrimson 
                 ? 'border-transparent hover:bg-red-950/40 text-red-500/70 hover:text-red-400' 
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
@@ -159,11 +175,12 @@ export default function Dock({
           {/* Master 16-Bit TIFF Export */}
           <button
             type="button"
+            aria-label="Export 16-Bit TIFF Master"
             onClick={() => {
               soundEngine.playClick();
               onOpenExport();
             }}
-            className={`min-w-[48px] h-12 px-3.5 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${
+            className={`min-w-[48px] h-12 px-3.5 rounded-full flex items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-medium border ${focusRing} ${
               isCrimson 
                 ? 'border-red-900/60 bg-red-950/30 hover:bg-red-900/40 text-red-400' 
                 : 'border-white/15 bg-white/5 hover:bg-white/10 text-slate-200'
@@ -177,11 +194,13 @@ export default function Dock({
           {/* OLED Astro Red Mode Toggle */}
           <button
             type="button"
+            aria-label="Toggle OLED Night Crimson Mode"
+            aria-pressed={isCrimson}
             onClick={() => {
               soundEngine.playClick();
               onToggleCrimson();
             }}
-            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${
+            className={`min-w-[48px] h-12 px-3 rounded-full flex items-center justify-center transition-all active:scale-95 border ${focusRing} ${
               isCrimson 
                 ? 'bg-red-600 text-black border-red-500' 
                 : 'border-transparent hover:bg-white/10 text-slate-400 hover:text-slate-200'
