@@ -73,16 +73,37 @@ def _process_single_channel_gradient(
 
     coeffs, _, _, _ = np.linalg.lstsq(a_valid, z_valid, rcond=None)
 
-    # Evaluate fitted background model across full image resolution
-    y_full, x_full = np.mgrid[0:h, 0:w]
-    x_full_norm = (2.0 * x_full / max(1, w - 1)) - 1.0
-    y_full_norm = (2.0 * y_full / max(1, h - 1)) - 1.0
+    # Fast evaluation of fitted polynomial surface using 1D coordinate broadcasting
+    # Avoids allocating massive 2D meshgrids and (H*W, 6) feature matrices (~95MB on 1080p)
+    x_1d = (2.0 * np.arange(w, dtype=np.float32) / max(1, w - 1)) - 1.0
+    y_1d = (2.0 * np.arange(h, dtype=np.float32) / max(1, h - 1)) - 1.0
 
-    full_features = _build_bivariate_poly_features(x_full_norm, y_full_norm, order=order)
-    background_model = (full_features @ coeffs).reshape(h, w)
+    if order == 2 and len(coeffs) == 6:
+        # Factored Horner evaluation: O(H*W) with minimal intermediate allocations
+        # Basis terms: [1, y, x, y^2, x*y, x^2]
+        x_1 = x_1d.reshape(1, w)
+        y_1 = y_1d.reshape(h, 1)
+        row_const = coeffs[0] + coeffs[2] * x_1 + coeffs[5] * (x_1 * x_1)
+        row_y1 = coeffs[1] + coeffs[4] * x_1
+        background_model = row_const + y_1 * row_y1 + (y_1 * y_1) * coeffs[3]
+    else:
+        # General arbitrary order fallback with broadcasting
+        idx = 0
+        background_model = np.zeros((h, w), dtype=np.float32)
+        for total_deg in range(order + 1):
+            for i in range(total_deg + 1):
+                j = total_deg - i
+                term_x = (x_1d ** i).reshape(1, w)
+                term_y = (y_1d ** j).reshape(h, 1)
+                background_model += coeffs[idx] * (term_y * term_x)
+                idx += 1
 
     # Pedestal level: preserve the median background level so shadows are not clipped
-    pedestal = float(np.median(background_model))
+    # On large images (>=512x512), use strided subsampling for O(1) median calculation
+    if h >= 512 and w >= 512:
+        pedestal = float(np.median(background_model[::4, ::4]))
+    else:
+        pedestal = float(np.median(background_model))
 
     # Subtraction with pedestal preservation
     corrected = channel_float - background_model + pedestal
