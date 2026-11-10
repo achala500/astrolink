@@ -73,13 +73,25 @@ def _process_single_channel_gradient(
 
     coeffs, _, _, _ = np.linalg.lstsq(a_valid, z_valid, rcond=None)
 
-    # Evaluate fitted background model across full image resolution
-    y_full, x_full = np.mgrid[0:h, 0:w]
-    x_full_norm = (2.0 * x_full / max(1, w - 1)) - 1.0
-    y_full_norm = (2.0 * y_full / max(1, h - 1)) - 1.0
-
-    full_features = _build_bivariate_poly_features(x_full_norm, y_full_norm, order=order)
-    background_model = (full_features @ coeffs).reshape(h, w)
+    # Fast evaluation of fitted background model across full image resolution.
+    # For order=2, we use 1D coordinate broadcasting and Horner factoring:
+    # background(x, y) = c0 + y*(c1 + c3*y) + x*(c2 + c4*y + c5*x).
+    # This avoids allocating multi-hundred MB 2D meshgrids and feature matrices (O(1) memory per pixel).
+    if order == 2 and len(coeffs) == 6:
+        x_1d = ((2.0 * np.arange(w, dtype=np.float32) / max(1, w - 1)) - 1.0).reshape(1, w)
+        y_1d = ((2.0 * np.arange(h, dtype=np.float32) / max(1, h - 1)) - 1.0).reshape(h, 1)
+        c0, c1, c2, c3, c4, c5 = coeffs
+        background_model = (
+            c0
+            + y_1d * (c1 + c3 * y_1d)
+            + x_1d * (c2 + c4 * y_1d + c5 * x_1d)
+        )
+    else:
+        y_full, x_full = np.mgrid[0:h, 0:w]
+        x_full_norm = (2.0 * x_full / max(1, w - 1)) - 1.0
+        y_full_norm = (2.0 * y_full / max(1, h - 1)) - 1.0
+        full_features = _build_bivariate_poly_features(x_full_norm, y_full_norm, order=order)
+        background_model = (full_features @ coeffs).reshape(h, w)
 
     # Pedestal level: preserve the median background level so shadows are not clipped
     pedestal = float(np.median(background_model))
