@@ -14,6 +14,23 @@ from backend.app.licensing import (
 from backend.app.main import AstrophotographySession
 
 
+TEST_PRIVATE_KEY_HEX = "c0da84c7fc6f83c8acc46e4b95150f60c267e4f1e0ceffcdf460be0ed9f2c0fd"
+
+
+@pytest.fixture(autouse=True)
+def setup_test_master_key(monkeypatch):
+    """Provides test private key via environment variable without hardcoding in app logic."""
+    monkeypatch.setenv("ASTROLINK_MASTER_PRIVATE_KEY", TEST_PRIVATE_KEY_HEX)
+
+
+def test_mint_without_private_key_raises_error(monkeypatch):
+    """Calling mint_license without environment variable or parameter must securely fail."""
+    monkeypatch.delenv("ASTROLINK_MASTER_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("ASTROLINK_PRIVATE_KEY", raising=False)
+    with pytest.raises(ValueError, match="Private signing key required"):
+        mint_license("Dark Sky Observer", "lifetime")
+
+
 def test_mint_and_verify_valid_license():
     """Valid Ed25519 license should verify completely offline with unlimited frames."""
     key = mint_license("Hubble Observer", "lifetime")

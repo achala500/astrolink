@@ -1,0 +1,4 @@
+## 2026-11-10 - Asymmetric Licensing Key Exposure in Client-Side Binaries
+**Vulnerability:** The Ed25519 master private signing key was hardcoded in `backend/app/licensing.py` alongside the public verification key, allowing any user or client binary inspection to mint unauthorized unlimited lifetime licenses.
+**Learning:** In offline licensing architectures using asymmetric cryptography (e.g. Ed25519), client binaries and shipped runtime code only require the public verification key. The private signing key must reside strictly on licensing servers or be supplied via secure environment variables (`ASTROLINK_MASTER_PRIVATE_KEY`) in offline minting environments.
+**Prevention:** Never commit private signing keys or defaults into shipping modules. Enforce environment-based injection for signing operations and add unit tests asserting that missing keys securely abort minting attempts.
