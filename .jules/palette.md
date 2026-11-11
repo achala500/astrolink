@@ -1,0 +1,5 @@
+# Palette's Journal - Critical UX & Accessibility Learnings
+
+## 2026-11-11 - Scotopic-Preserving Keyboard Focus Rings in Night Vision Astrophotography UIs
+**Learning:** Standard web focus indicators (e.g., bright blue or white rings) destroy dark adaptation (scotopic vision) during night-sky observation sessions. In dual-theme astro apps offering an OLED Crimson night mode alongside standard dark mode, interactive keyboard focus outlines must dynamically adapt: using `focus-visible:ring-red-500` in crimson mode to protect rod photoreceptor sensitivity and `focus-visible:ring-emerald-400` in standard dark mode for high-contrast accessibility. Additionally, icon-only buttons in floating action docks must always feature both descriptive `aria-label` tags and `aria-pressed` state attributes so screen reader users receive immediate toggle feedback without seeing-condition dependencies.
+**Action:** Always verify keyboard navigation focus states on all floating toolbar/dock elements and ensure focus rings adjust dynamically to active night-vision red palettes.
